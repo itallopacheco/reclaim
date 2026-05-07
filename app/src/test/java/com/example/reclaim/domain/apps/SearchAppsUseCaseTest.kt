@@ -32,6 +32,16 @@ class SearchAppsUseCaseTest {
     }
 
     @Test
+    fun `surfaces removed apps again in search`() {
+        val catalog = FakeAppCatalog(listOf(instagram, whatsapp))
+        val emptyRepo = FakeAddedAppsRepository()
+
+        val result = SearchAppsUseCase(catalog, emptyRepo).invoke("what")
+
+        assertEquals(listOf(whatsapp), result)
+    }
+
+    @Test
     fun `matches uppercase queries the same as lowercase`() {
         val catalog = FakeAppCatalog(listOf(instagram, whatsapp, tiktok))
         val addedRepo = FakeAddedAppsRepository()
