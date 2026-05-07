@@ -1,5 +1,7 @@
 package com.example.reclaim.domain.apps
 
+import kotlin.time.Duration
+
 class SuggestAppsUseCase(
     private val catalog: AppCatalog,
     private val usageStats: UsageStats,
@@ -9,6 +11,7 @@ class SuggestAppsUseCase(
         val usage = usageStats.avgDailyUsageLast7Days()
         return catalog.installedApps()
             .map { SuggestedApp(it, usage.getValue(it.packageName)) }
+            .filter { it.avgDaily > Duration.ZERO }
             .sortedByDescending { it.avgDaily }
     }
 }
