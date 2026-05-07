@@ -4,10 +4,13 @@ import android.content.Intent
 import android.provider.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.eventFlow
+import kotlinx.coroutines.flow.filter
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -47,7 +50,7 @@ fun ReclaimNavHost(
             )
         }
         composable(Destination.OnboardingPermissions.route) {
-            OnResume {
+            OnResumeDeferred {
                 if (app.usageStats.hasUsageAccess()) navController.enterMainApp()
             }
             OnboardingPermissionsScreen(
@@ -138,6 +141,10 @@ private fun NavHostController.enterMainApp() {
     }
 }
 
+/**
+ * Synchronous ON_RESUME hook. Action runs inside the LifecycleRegistry dispatch loop;
+ * use only for side effects that don't mutate the NavController back stack.
+ */
 @Composable
 private fun OnResume(action: () -> Unit) {
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -147,5 +154,19 @@ private fun OnResume(action: () -> Unit) {
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+}
+
+/**
+ * Deferred ON_RESUME hook. Action runs on Main.immediate after the lifecycle dispatch
+ * has unwound, so it's safe to navigate from inside [action].
+ */
+@Composable
+private fun OnResumeDeferred(action: () -> Unit) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.lifecycle.eventFlow
+            .filter { it == Lifecycle.Event.ON_RESUME }
+            .collect { action() }
     }
 }
