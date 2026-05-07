@@ -20,4 +20,14 @@ class SearchAppsUseCaseTest {
 
         assertEquals(listOf(whatsapp), result)
     }
+
+    @Test
+    fun `matches uppercase queries the same as lowercase`() {
+        val catalog = FakeAppCatalog(listOf(instagram, whatsapp, tiktok))
+        val addedRepo = FakeAddedAppsRepository()
+
+        val result = SearchAppsUseCase(catalog, addedRepo).invoke("WHAT")
+
+        assertEquals(listOf(whatsapp), result)
+    }
 }
