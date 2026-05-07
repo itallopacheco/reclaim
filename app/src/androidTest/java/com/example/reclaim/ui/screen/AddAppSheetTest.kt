@@ -163,4 +163,29 @@ class AddAppSheetTest {
         composeRule.onAllNodesWithText("Instagram").assertCountEquals(0)
         composeRule.onAllNodesWithText("TikTok").assertCountEquals(0)
     }
+
+    @Test
+    fun searchWithoutMatchesShowsNoMatchesText() {
+        val instagram = App("com.instagram.android", "Instagram", isLauncherApp = true)
+        val repo = FakeAddedAppsRepository()
+        val catalog = FakeAppCatalog(listOf(instagram))
+        val usage = FakeUsageStats(mapOf(instagram.packageName to 60.minutes))
+
+        composeRule.setContent {
+            ReclaimTheme {
+                AddAppSheetContent(
+                    suggestApps = SuggestAppsUseCase(catalog, usage, repo),
+                    searchApps = SearchAppsUseCase(catalog, repo),
+                    addedApps = repo,
+                    onDismiss = {},
+                    onSaved = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Search installed apps")
+            .performTextInput("xyz")
+
+        composeRule.onNodeWithText("No matches").assertIsDisplayed()
+    }
 }
