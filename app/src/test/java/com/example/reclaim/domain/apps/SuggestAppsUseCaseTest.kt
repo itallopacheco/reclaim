@@ -41,6 +41,32 @@ class SuggestAppsUseCaseTest {
     }
 
     @Test
+    fun `excludes apps without launcher icon`() {
+        val catalog = FakeAppCatalog(
+            listOf(
+                App("com.a", "Alpha", isLauncherApp = true),
+                App("com.b", "Beta", isLauncherApp = false),
+            )
+        )
+        val usageStats = FakeUsageStats(
+            mapOf(
+                "com.a" to 60.minutes,
+                "com.b" to 120.minutes,
+            )
+        )
+        val addedRepo = FakeAddedAppsRepository()
+
+        val result = SuggestAppsUseCase(catalog, usageStats, addedRepo).invoke()
+
+        assertEquals(
+            listOf(
+                SuggestedApp(App("com.a", "Alpha", isLauncherApp = true), 60.minutes),
+            ),
+            result
+        )
+    }
+
+    @Test
     fun `excludes apps already added`() {
         val catalog = FakeAppCatalog(
             listOf(
