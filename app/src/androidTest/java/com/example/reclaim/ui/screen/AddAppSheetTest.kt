@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
+import com.example.reclaim.domain.apps.AddedApp
 import com.example.reclaim.domain.apps.App
 import com.example.reclaim.domain.apps.SearchAppsUseCase
 import com.example.reclaim.domain.apps.SuggestAppsUseCase
@@ -223,6 +224,43 @@ class AddAppSheetTest {
             .performTextInput("xyz")
 
         composeRule.onNodeWithText("No matches").assertIsDisplayed()
+    }
+
+    @Test
+    fun alreadyAddedAppsAreHiddenFromBothLists() {
+        val instagram = App("com.instagram.android", "Instagram", isLauncherApp = true)
+        val whatsapp = App("com.whatsapp", "WhatsApp", isLauncherApp = true)
+        val repo = FakeAddedAppsRepository(
+            initial = listOf(AddedApp(instagram.packageName, 1.hours))
+        )
+        val catalog = FakeAppCatalog(listOf(instagram, whatsapp))
+        val usage = FakeUsageStats(
+            mapOf(
+                instagram.packageName to 60.minutes,
+                whatsapp.packageName to 30.minutes,
+            )
+        )
+
+        composeRule.setContent {
+            ReclaimTheme {
+                AddAppSheetContent(
+                    suggestApps = SuggestAppsUseCase(catalog, usage, repo),
+                    searchApps = SearchAppsUseCase(catalog, repo),
+                    addedApps = repo,
+                    onDismiss = {},
+                    onSaved = {},
+                )
+            }
+        }
+
+        // Suggested: WhatsApp visible, Instagram hidden.
+        composeRule.onNodeWithText("WhatsApp").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Instagram").assertCountEquals(0)
+
+        // Search: same.
+        composeRule.onNodeWithContentDescription("Search installed apps")
+            .performTextInput("ins")
+        composeRule.onAllNodesWithText("Instagram").assertCountEquals(0)
     }
 
     @Test
