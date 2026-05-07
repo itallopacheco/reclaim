@@ -6,8 +6,11 @@ import androidx.datastore.preferences.core.Preferences
 import com.example.reclaim.domain.apps.AddedApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -58,5 +61,22 @@ class DataStoreAddedAppsRepositoryTest {
         repository.add(AddedApp("com.example.foo", 45.minutes))
 
         assertEquals(listOf(AddedApp("com.example.foo", 45.minutes)), repository.addedApps())
+    }
+
+    @Test
+    fun `addedApps survives across repository instances backed by the same file`() {
+        val file = tmpFolder.newFile("survive.preferences_pb")
+
+        val firstScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+        DataStoreAddedAppsRepository(
+            PreferenceDataStoreFactory.create(scope = firstScope, produceFile = { file }),
+        ).add(AddedApp("com.example.foo", 30.minutes))
+        runBlocking { firstScope.coroutineContext[Job]!!.cancelAndJoin() }
+
+        val survivor = DataStoreAddedAppsRepository(
+            PreferenceDataStoreFactory.create(scope = scope, produceFile = { file }),
+        )
+
+        assertEquals(listOf(AddedApp("com.example.foo", 30.minutes)), survivor.addedApps())
     }
 }
