@@ -141,6 +141,7 @@ private fun AppsScreenPreview() {
             addedApps = object : AddedAppsRepository {
                 override fun addedApps() = emptyList<com.example.reclaim.domain.apps.AddedApp>()
                 override fun add(addedApp: com.example.reclaim.domain.apps.AddedApp) {}
+                override fun delete(packageName: String) {}
             },
             catalog = object : AppCatalog {
                 override fun installedApps() = emptyList<com.example.reclaim.domain.apps.App>()

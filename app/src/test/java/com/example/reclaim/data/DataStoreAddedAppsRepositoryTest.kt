@@ -64,6 +64,16 @@ class DataStoreAddedAppsRepositoryTest {
     }
 
     @Test
+    fun `delete removes the app from addedApps`() {
+        val repository = DataStoreAddedAppsRepository(newDataStore())
+
+        repository.add(AddedApp("com.example.target", 30.minutes))
+        repository.delete("com.example.target")
+
+        assertTrue(repository.addedApps().isEmpty())
+    }
+
+    @Test
     fun `addedApps survives across repository instances backed by the same file`() {
         val file = tmpFolder.newFile("survive.preferences_pb")
 

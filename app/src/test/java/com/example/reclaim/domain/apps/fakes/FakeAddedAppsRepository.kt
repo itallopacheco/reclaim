@@ -17,6 +17,8 @@ class FakeAddedAppsRepository(initialPackageNames: Set<String> = emptySet()) : A
         apps.add(addedApp)
     }
 
+    override fun delete(packageName: String) {}
+
     private companion object {
         val DEFAULT_QUOTA: Duration = 1.hours
     }

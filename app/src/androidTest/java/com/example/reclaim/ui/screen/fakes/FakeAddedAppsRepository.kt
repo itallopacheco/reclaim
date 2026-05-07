@@ -12,4 +12,6 @@ class FakeAddedAppsRepository(initial: List<AddedApp> = emptyList()) : AddedApps
         apps.removeAll { it.packageName == addedApp.packageName }
         apps.add(addedApp)
     }
+
+    override fun delete(packageName: String) {}
 }
