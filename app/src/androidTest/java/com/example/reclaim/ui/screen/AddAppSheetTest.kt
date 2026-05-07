@@ -4,6 +4,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.example.reclaim.domain.apps.App
@@ -13,6 +14,7 @@ import com.example.reclaim.ui.screen.fakes.FakeAddedAppsRepository
 import com.example.reclaim.ui.screen.fakes.FakeAppCatalog
 import com.example.reclaim.ui.screen.fakes.FakeUsageStats
 import com.example.reclaim.ui.theme.ReclaimTheme
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import org.junit.Rule
 import org.junit.Test
@@ -70,5 +72,31 @@ class AddAppSheetTest {
 
         composeRule.onNodeWithText("Instagram").performClick()
         composeRule.onNodeWithText("SELECTED").assertIsDisplayed()
+    }
+
+    @Test
+    fun quotaStepperPlusButtonStopsAt8h() {
+        val instagram = App("com.instagram.android", "Instagram", isLauncherApp = true)
+        val repo = FakeAddedAppsRepository()
+        val catalog = FakeAppCatalog(listOf(instagram))
+        val usage = FakeUsageStats(mapOf(instagram.packageName to 60.minutes))
+
+        composeRule.setContent {
+            ReclaimTheme {
+                AddAppSheetContent(
+                    suggestApps = SuggestAppsUseCase(catalog, usage, repo),
+                    searchApps = SearchAppsUseCase(catalog, repo),
+                    addedApps = repo,
+                    onDismiss = {},
+                    onSaved = {},
+                    initialQuota = 7.hours + 45.minutes,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Instagram").performClick()
+        // 7h45m + 15m = 8h, then plus must be disabled
+        composeRule.onNodeWithContentDescription("Increase quota").performClick()
+        composeRule.onNodeWithContentDescription("Increase quota").assertIsNotEnabled()
     }
 }

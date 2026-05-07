@@ -1,6 +1,7 @@
 package com.example.reclaim.ui.screen
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,8 +12,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -37,7 +46,11 @@ import com.example.reclaim.ui.theme.ReclaimBg
 import com.example.reclaim.ui.theme.ReclaimInk
 import com.example.reclaim.ui.theme.ReclaimInk2
 import com.example.reclaim.ui.theme.ReclaimInk3
+import com.example.reclaim.ui.theme.ReclaimLine
 import com.example.reclaim.ui.theme.ReclaimTeal
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,8 +85,10 @@ fun AddAppSheetContent(
     addedApps: AddedAppsRepository,
     onDismiss: () -> Unit,
     onSaved: () -> Unit,
+    initialQuota: Duration = QUOTA_DEFAULT,
 ) {
     var selectedApp by remember { mutableStateOf<App?>(null) }
+    var quota by remember { mutableStateOf(initialQuota) }
     val suggestions = remember(selectedApp) { suggestApps.invoke() }
 
     Column(
@@ -92,7 +107,12 @@ fun AddAppSheetContent(
         if (selectedApp != null) {
             SectionLabel("SELECTED")
             Spacer(Modifier.height(12.dp))
-            SelectedAppCard(app = selectedApp!!)
+            SelectedAppCard(
+                app = selectedApp!!,
+                quota = quota,
+                onQuotaIncrease = { quota = (quota + QUOTA_STEP).coerceAtMost(QUOTA_MAX) },
+                onQuotaDecrease = { quota = (quota - QUOTA_STEP).coerceAtLeast(QUOTA_MIN) },
+            )
             Spacer(Modifier.height(20.dp))
         }
 
@@ -108,6 +128,11 @@ fun AddAppSheetContent(
         }
     }
 }
+
+private val QUOTA_STEP = 15.minutes
+private val QUOTA_MIN = 15.minutes
+private val QUOTA_MAX = 8.hours
+private val QUOTA_DEFAULT = 1.hours
 
 @Composable
 private fun Header(
@@ -148,24 +173,114 @@ private fun SectionLabel(text: String) {
 }
 
 @Composable
-private fun SelectedAppCard(app: App) {
-    Row(
+private fun SelectedAppCard(
+    app: App,
+    quota: Duration,
+    onQuotaIncrease: () -> Unit,
+    onQuotaDecrease: () -> Unit,
+) {
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .background(Color.White)
             .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
     ) {
-        AppIcon(app = app)
-        Spacer(Modifier.size(12.dp))
-        Text(
-            app.displayName,
-            color = ReclaimInk,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.SemiBold,
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AppIcon(app = app)
+            Spacer(Modifier.size(12.dp))
+            Text(
+                app.displayName,
+                color = ReclaimInk,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Spacer(Modifier.height(16.dp))
+        SectionLabel("DAILY QUOTA")
+        Spacer(Modifier.height(8.dp))
+        QuotaStepper(
+            quota = quota,
+            onIncrease = onQuotaIncrease,
+            onDecrease = onQuotaDecrease,
         )
     }
+}
+
+@Composable
+private fun QuotaStepper(
+    quota: Duration,
+    onIncrease: () -> Unit,
+    onDecrease: () -> Unit,
+) {
+    val canIncrease = quota < QUOTA_MAX
+    val canDecrease = quota > QUOTA_MIN
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        StepperButton(
+            icon = Icons.Filled.Remove,
+            contentDescription = "Decrease quota",
+            enabled = canDecrease,
+            onClick = onDecrease,
+        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = formatQuota(quota),
+                color = ReclaimInk,
+                fontSize = 34.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = "15 min increments",
+                color = ReclaimInk3,
+                fontSize = 11.sp,
+            )
+        }
+        StepperButton(
+            icon = Icons.Filled.Add,
+            contentDescription = "Increase quota",
+            enabled = canIncrease,
+            onClick = onIncrease,
+        )
+    }
+}
+
+@Composable
+private fun StepperButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .border(1.dp, ReclaimLine, CircleShape)
+            .clickable(enabled = enabled, onClick = onClick)
+            .semantics {
+                this.contentDescription = contentDescription
+                if (!enabled) disabled()
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (enabled) ReclaimInk else ReclaimInk3,
+            modifier = Modifier.size(16.dp),
+        )
+    }
+}
+
+private fun formatQuota(quota: Duration): String {
+    val totalMinutes = quota.inWholeMinutes
+    val h = totalMinutes / 60
+    val m = totalMinutes % 60
+    return "%dh %02dm".format(h, m)
 }
 
 @Composable
