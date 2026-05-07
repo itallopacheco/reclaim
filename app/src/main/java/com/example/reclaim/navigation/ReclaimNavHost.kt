@@ -1,16 +1,13 @@
 package com.example.reclaim.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.reclaim.data.DemoAppCatalog
-import com.example.reclaim.data.DemoUsageStats
-import com.example.reclaim.data.InMemoryAddedAppsRepository
-import com.example.reclaim.domain.apps.SearchAppsUseCase
-import com.example.reclaim.domain.apps.SuggestAppsUseCase
+import com.example.reclaim.reclaimApplication
 import com.example.reclaim.ui.main.MainScaffold
 import com.example.reclaim.ui.main.switchTab
 import com.example.reclaim.ui.screen.AddAppSheet
@@ -26,6 +23,7 @@ import com.example.reclaim.ui.screen.OnboardingValueScreen
 fun ReclaimNavHost(
     navController: NavHostController = rememberNavController()
 ) {
+    val app = LocalContext.current.reclaimApplication()
     NavHost(
         navController = navController,
         startDestination = Destination.OnboardingValue.route
@@ -63,8 +61,8 @@ fun ReclaimNavHost(
                 onFabClick = { navController.navigate(Destination.AddApp.route) }
             ) {
                 AppsScreen(
-                    addedApps = InMemoryAddedAppsRepository,
-                    catalog = DemoAppCatalog,
+                    addedApps = app.addedApps,
+                    catalog = app.appCatalog,
                     onAppClick = { _ -> navController.navigate(Destination.Lock.route) },
                 )
             }
@@ -84,16 +82,9 @@ fun ReclaimNavHost(
         // dismisses by popping back to the previous destination) ----------
         composable(Destination.AddApp.route) {
             AddAppSheet(
-                suggestApps = SuggestAppsUseCase(
-                    catalog = DemoAppCatalog,
-                    usageStats = DemoUsageStats,
-                    addedApps = InMemoryAddedAppsRepository,
-                ),
-                searchApps = SearchAppsUseCase(
-                    catalog = DemoAppCatalog,
-                    addedApps = InMemoryAddedAppsRepository,
-                ),
-                addedApps = InMemoryAddedAppsRepository,
+                suggestApps = app.suggestApps,
+                searchApps = app.searchApps,
+                addedApps = app.addedApps,
                 onDismiss = { navController.popBackStack() },
                 onSaved = { navController.popBackStack() },
             )
