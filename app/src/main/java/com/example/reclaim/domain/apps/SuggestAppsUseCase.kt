@@ -9,7 +9,9 @@ class SuggestAppsUseCase(
 ) {
     fun invoke(): List<SuggestedApp> {
         val usage = usageStats.avgDailyUsageLast7Days()
+        val added = addedApps.addedPackageNames()
         return catalog.installedApps()
+            .filter { it.packageName !in added }
             .map { SuggestedApp(it, usage.getValue(it.packageName)) }
             .filter { it.avgDaily > Duration.ZERO }
             .sortedByDescending { it.avgDaily }
