@@ -1,12 +1,15 @@
 package com.example.reclaim.ui.screen
 
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import com.example.reclaim.domain.apps.App
 import com.example.reclaim.domain.apps.SearchAppsUseCase
 import com.example.reclaim.domain.apps.SuggestAppsUseCase
@@ -124,5 +127,40 @@ class AddAppSheetTest {
         // 30m - 15m = 15m, then minus must be disabled
         composeRule.onNodeWithContentDescription("Decrease quota").performClick()
         composeRule.onNodeWithContentDescription("Decrease quota").assertIsNotEnabled()
+    }
+
+    @Test
+    fun searchFiltersAppsBySubstringIgnoringCase() {
+        val instagram = App("com.instagram.android", "Instagram", isLauncherApp = true)
+        val whatsapp = App("com.whatsapp", "WhatsApp", isLauncherApp = true)
+        val tiktok = App("com.tiktok", "TikTok", isLauncherApp = true)
+        val repo = FakeAddedAppsRepository()
+        val catalog = FakeAppCatalog(listOf(instagram, whatsapp, tiktok))
+        val usage = FakeUsageStats(
+            mapOf(
+                instagram.packageName to 60.minutes,
+                whatsapp.packageName to 30.minutes,
+                tiktok.packageName to 90.minutes,
+            )
+        )
+
+        composeRule.setContent {
+            ReclaimTheme {
+                AddAppSheetContent(
+                    suggestApps = SuggestAppsUseCase(catalog, usage, repo),
+                    searchApps = SearchAppsUseCase(catalog, repo),
+                    addedApps = repo,
+                    onDismiss = {},
+                    onSaved = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Search installed apps")
+            .performTextInput("WHAT")
+
+        composeRule.onNodeWithText("WhatsApp").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Instagram").assertCountEquals(0)
+        composeRule.onAllNodesWithText("TikTok").assertCountEquals(0)
     }
 }

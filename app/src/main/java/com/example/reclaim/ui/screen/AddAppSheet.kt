@@ -20,6 +20,8 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
@@ -89,7 +91,11 @@ fun AddAppSheetContent(
 ) {
     var selectedApp by remember { mutableStateOf<App?>(null) }
     var quota by remember { mutableStateOf(initialQuota) }
+    var query by remember { mutableStateOf("") }
     val suggestions = remember(selectedApp) { suggestApps.invoke() }
+    val searchResults = remember(query, selectedApp) {
+        if (query.isEmpty()) emptyList() else searchApps.invoke(query)
+    }
 
     Column(
         modifier = Modifier
@@ -102,6 +108,8 @@ fun AddAppSheetContent(
             onCancel = onDismiss,
             onSave = onSaved,
         )
+        Spacer(Modifier.height(20.dp))
+        SearchField(query = query, onQueryChange = { query = it })
         Spacer(Modifier.height(20.dp))
 
         if (selectedApp != null) {
@@ -116,14 +124,34 @@ fun AddAppSheetContent(
             Spacer(Modifier.height(20.dp))
         }
 
-        SectionLabel("SUGGESTED · MOST USED")
-        Spacer(Modifier.height(12.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            suggestions.forEach { suggestion ->
-                SuggestedAppRow(
-                    app = suggestion.app,
-                    onClick = { selectedApp = suggestion.app },
+        if (query.isEmpty()) {
+            SectionLabel("SUGGESTED · MOST USED")
+            Spacer(Modifier.height(12.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                suggestions.forEach { suggestion ->
+                    SuggestedAppRow(
+                        app = suggestion.app,
+                        onClick = { selectedApp = suggestion.app },
+                    )
+                }
+            }
+        } else {
+            if (searchResults.isEmpty()) {
+                Text(
+                    text = "No matches",
+                    color = ReclaimInk3,
+                    fontSize = 14.sp,
+                    modifier = Modifier.fillMaxWidth(),
                 )
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    searchResults.forEach { app ->
+                        SuggestedAppRow(
+                            app = app,
+                            onClick = { selectedApp = app },
+                        )
+                    }
+                }
             }
         }
     }
@@ -157,6 +185,47 @@ private fun Header(
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
             )
+        }
+    }
+}
+
+@Composable
+private fun SearchField(query: String, onQueryChange: (String) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(ReclaimLine)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            Icons.Filled.Search,
+            contentDescription = null,
+            tint = ReclaimInk3,
+            modifier = Modifier.size(17.dp),
+        )
+        Spacer(Modifier.size(8.dp))
+        Box(modifier = Modifier.fillMaxWidth()) {
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    color = ReclaimInk,
+                    fontSize = 14.5.sp,
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics { contentDescription = "Search installed apps" },
+            )
+            if (query.isEmpty()) {
+                Text(
+                    text = "Search installed apps",
+                    color = ReclaimInk3,
+                    fontSize = 14.5.sp,
+                )
+            }
         }
     }
 }
