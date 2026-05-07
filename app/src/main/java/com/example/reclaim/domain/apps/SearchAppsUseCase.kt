@@ -5,7 +5,7 @@ class SearchAppsUseCase(
     private val addedApps: AddedAppsRepository,
 ) {
     fun invoke(query: String): List<App> {
-        val added = addedApps.addedPackageNames()
+        val added = addedApps.addedApps().mapTo(HashSet()) { it.packageName }
         return catalog.installedApps()
             .filter { it.packageName !in added }
             .filter { it.displayName.contains(query, ignoreCase = true) }
