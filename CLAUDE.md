@@ -19,10 +19,17 @@ Version catalog: `gradle/libs.versions.toml`. Add new deps there, then reference
 ./gradlew :app:compileDebugKotlin   # fast compile check
 ./gradlew :app:assembleDebug        # build debug APK
 ./gradlew :app:installDebug         # install to connected device/emulator
-./gradlew test                      # unit tests (JVM)
+./gradlew test                      # all JVM unit tests (debug + release variants)
+./gradlew :app:testDebugUnitTest    # JVM unit tests, debug variant only (faster)
 ./gradlew connectedAndroidTest      # instrumented tests (needs device)
 ./gradlew lint                      # Android lint
 ./gradlew clean
+```
+
+During TDD, run a single test class to keep the loop tight:
+
+```bash
+./gradlew :app:testDebugUnitTest --tests "com.example.reclaim.domain.apps.SuggestAppsUseCaseTest"
 ```
 
 Launch after install: `adb shell am start -n com.example.reclaim/.MainActivity`.
@@ -35,21 +42,39 @@ For UI iteration prefer Android Studio's `@Preview` over running the app — eve
 app/src/main/java/com/example/reclaim/
 ├── MainActivity.kt              # entry point, hosts ReclaimNavHost under ReclaimTheme
 ├── navigation/
-│   ├── Destinations.kt          # sealed Destination(route) routes
+│   ├── Destinations.kt          # sealed Destination(route) + TabDestination enum
 │   └── ReclaimNavHost.kt        # NavHost wiring; screens get callbacks, not NavController
+├── domain/
+│   └── apps/                    # pure-JVM domain layer for the "added apps" feature
+│       ├── App.kt, SuggestedApp.kt
+│       ├── AppCatalog.kt, UsageStats.kt, AddedAppsRepository.kt   # interfaces
+│       ├── SuggestAppsUseCase.kt
+│       └── SearchAppsUseCase.kt
 └── ui/
+    ├── main/
+    │   └── MainScaffold.kt      # tab bar host (Home / Apps / Habits) + FAB
     ├── screen/                  # one file per screen, public @Composable
-    │   ├── LockScreen.kt        # PoC translated from Claude Design export
-    │   ├── HomeScreen.kt
-    │   ├── DetailScreen.kt
-    │   └── SettingsScreen.kt
+    │   ├── OnboardingValueScreen.kt, OnboardingPermissionsScreen.kt
+    │   ├── HomeScreen.kt, AppsScreen.kt, HabitsScreen.kt
+    │   ├── AddAppSheet.kt, AddHabitSheet.kt    # ModalBottomSheet routes
+    │   └── LockScreen.kt        # full design translation, the rest are stubs
     └── theme/
-        ├── Color.kt             # Reclaim* design tokens (16 values)
+        ├── Color.kt             # Reclaim* design tokens
         ├── Theme.kt             # ReclaimTheme, light-only, no dynamic color
         └── Type.kt
 ```
 
-Start destination is `Destination.Lock` while the lock screen is the PoC focus.
+Start destination is `Destination.OnboardingValue`. After onboarding, `Destination.Home` is the entry to the tab graph.
+
+## Architecture
+
+Three loose layers. No DI framework yet, no ViewModels yet.
+
+- **`ui/`** — Compose screens and the tab scaffold. Screens are pure presentation: state via `remember`, navigation via callbacks.
+- **`domain/`** — pure Kotlin/JVM. Use cases (`class Foo(deps...) { fun invoke(...) }`) operating on data classes (`App`, `SuggestedApp`). Dependencies are interfaces (`AppCatalog`, `UsageStats`, `AddedAppsRepository`) — implementations live elsewhere (today: nowhere; later: in `data/`).
+- **`data/`** — does not exist yet. Will hold `PackageManagerAppCatalog`, `UsageStatsManagerStats`, `DataStoreAddedAppsRepository` (fatia C). Filters that depend on real-world knowledge (e.g. excluding Reclaim's own package) belong here, **not** in the domain.
+
+Domain code is tested in pure JVM with hand-rolled fakes in `app/src/test/.../domain/apps/fakes/`. No mocking framework, no Robolectric in the domain tests.
 
 ## Conventions
 
@@ -69,4 +94,27 @@ Start destination is `Destination.Lock` while the lock screen is the PoC focus.
 
 ## Tests
 
-Currently only the default Android Studio scaffolding exists (`ExampleUnitTest`, `ExampleInstrumentedTest`). No domain logic to test yet. JUnit4 + `androidx.compose.ui:ui-test-junit4` are wired up.
+JUnit4 for JVM unit tests, `androidx.compose.ui:ui-test-junit4` available for Compose UI tests.
+
+Layout:
+
+```
+app/src/test/java/com/example/reclaim/
+└── domain/apps/
+    ├── SuggestAppsUseCaseTest.kt
+    ├── SearchAppsUseCaseTest.kt
+    └── fakes/
+        ├── FakeAppCatalog.kt
+        ├── FakeUsageStats.kt
+        └── FakeAddedAppsRepository.kt
+```
+
+The default `ExampleUnitTest` and `ExampleInstrumentedTest` scaffolding are kept — they validate the toolchain. Real tests today are in `domain/apps/`.
+
+Conventions:
+
+- Test class name = `<Subject>Test`, same package as production code
+- Test method names use Kotlin backticked descriptions (`fun \`excludes apps with zero avg daily usage\`()`)
+- Fakes live in a `fakes/` subpackage, one file per interface
+- Domain tests stay JVM-only — no Android framework, no Robolectric
+- Compose UI tests (when written) go to `app/src/androidTest/` and wrap subjects in `ReclaimTheme { ... }` so colors resolve

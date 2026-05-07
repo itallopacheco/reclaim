@@ -16,6 +16,7 @@ paths:
 
 - Screen-local state: `var x by remember { mutableStateOf(...) }`. No ViewModel layer in the codebase yet — don't introduce one without a reason.
 - Lists for UI lookup tables (e.g. habit definitions) go in a `private data class` + `remember { listOf(...) }` inside the screen. Inline data is fine until the third reuse.
+- For business logic that doesn't fit in a screen (filtering, ordering, validation), reach into `domain/` use cases. Construct them inline for now. When DI becomes worth it, that's a separate decision — don't preempt.
 
 ## Theme and design tokens
 
