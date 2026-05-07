@@ -10,7 +10,15 @@ class PackageManagerAppCatalog(
     private val ownPackageName: String,
 ) : AppCatalog {
 
-    override fun installedApps(): List<App> {
+    private var cached: List<App>? = null
+
+    override fun installedApps(): List<App> = cached ?: query().also { cached = it }
+
+    fun invalidate() {
+        cached = null
+    }
+
+    private fun query(): List<App> {
         val intent = Intent(Intent.ACTION_MAIN).apply { addCategory(Intent.CATEGORY_LAUNCHER) }
         return packageManager.queryIntentActivities(intent, 0)
             .filter { it.activityInfo.packageName != ownPackageName }

@@ -58,4 +58,36 @@ class PackageManagerAppCatalogTest {
             catalog.installedApps(),
         )
     }
+
+    @Test
+    fun `installedApps excludes apps installed without a launcher activity`() {
+        installLauncherApp("com.example.foo", "Foo")
+        // bar is installed but not registered for ACTION_MAIN + CATEGORY_LAUNCHER
+        shadow.installPackage(PackageInfo().apply {
+            packageName = "com.example.bar"
+            applicationInfo = ApplicationInfo().apply { packageName = "com.example.bar" }
+        })
+        val catalog = PackageManagerAppCatalog(packageManager, ownPackageName = "com.example.reclaim")
+
+        val packages = catalog.installedApps().map { it.packageName }
+        assertEquals(listOf("com.example.foo"), packages)
+    }
+
+    @Test
+    fun `installedApps caches the first read until invalidate is called`() {
+        installLauncherApp("com.example.foo", "Foo")
+        val catalog = PackageManagerAppCatalog(packageManager, ownPackageName = "com.example.reclaim")
+        catalog.installedApps() // prime cache
+
+        installLauncherApp("com.example.bar", "Bar")
+        val cached = catalog.installedApps().map { it.packageName }
+
+        catalog.invalidate()
+        val refreshed = catalog.installedApps().map { it.packageName }
+
+        assertEquals(
+            listOf(listOf("com.example.foo"), listOf("com.example.foo", "com.example.bar").sorted()),
+            listOf(cached.sorted(), refreshed.sorted()),
+        )
+    }
 }
