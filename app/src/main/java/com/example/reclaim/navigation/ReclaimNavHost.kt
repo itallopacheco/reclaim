@@ -13,15 +13,20 @@ import androidx.lifecycle.eventFlow
 import kotlinx.coroutines.flow.filter
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.example.reclaim.domain.apps.AddedApp
+import com.example.reclaim.domain.apps.App
 import com.example.reclaim.reclaimApplication
 import com.example.reclaim.ui.main.MainScaffold
 import com.example.reclaim.ui.main.switchTab
 import com.example.reclaim.ui.screen.AddAppSheet
 import com.example.reclaim.ui.screen.AddHabitSheet
 import com.example.reclaim.ui.screen.AppsScreen
+import com.example.reclaim.ui.screen.EditAppSheet
 import com.example.reclaim.ui.screen.HabitsScreen
 import com.example.reclaim.ui.screen.HomeScreen
 import com.example.reclaim.ui.screen.LockScreen
@@ -81,7 +86,9 @@ fun ReclaimNavHost(
                 AppsScreen(
                     addedApps = app.addedApps,
                     catalog = app.appCatalog,
-                    onAppClick = { _ -> navController.navigate(Destination.Lock.route) },
+                    onAppClick = { packageName ->
+                        navController.navigate(Destination.EditApp.routeFor(packageName))
+                    },
                 )
             }
         }
@@ -108,6 +115,36 @@ fun ReclaimNavHost(
                 onOpenUsageAccess = openUsageAccess,
                 onDismiss = { navController.popBackStack() },
                 onSaved = { navController.popBackStack() },
+            )
+        }
+        composable(
+            route = Destination.EditApp.route,
+            arguments = listOf(navArgument(Destination.EditApp.ARG_PACKAGE_NAME) {
+                type = NavType.StringType
+            }),
+        ) { backStackEntry ->
+            val packageName = backStackEntry.arguments
+                ?.getString(Destination.EditApp.ARG_PACKAGE_NAME)
+                ?: return@composable
+            val resolvedApp = app.appCatalog.installedApps()
+                .firstOrNull { it.packageName == packageName }
+                ?: App(packageName = packageName, displayName = packageName, isLauncherApp = true)
+            val currentQuota = app.addedApps.addedApps()
+                .firstOrNull { it.packageName == packageName }
+                ?.dailyQuota
+                ?: return@composable
+            EditAppSheet(
+                app = resolvedApp,
+                initialQuota = currentQuota,
+                onDismiss = { navController.popBackStack() },
+                onSave = { newQuota ->
+                    app.addedApps.add(AddedApp(packageName, newQuota))
+                    navController.popBackStack()
+                },
+                onRequestRemove = {
+                    app.addedApps.delete(packageName)
+                    navController.popBackStack()
+                },
             )
         }
         composable(Destination.AddHabit.route) {

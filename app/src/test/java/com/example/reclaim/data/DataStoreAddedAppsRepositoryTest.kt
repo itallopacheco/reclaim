@@ -64,6 +64,35 @@ class DataStoreAddedAppsRepositoryTest {
     }
 
     @Test
+    fun `delete removes the app from addedApps`() {
+        val repository = DataStoreAddedAppsRepository(newDataStore())
+
+        repository.add(AddedApp("com.example.target", 30.minutes))
+        repository.delete("com.example.target")
+
+        assertTrue(repository.addedApps().isEmpty())
+    }
+
+    @Test
+    fun `delete persists across repository instances backed by the same file`() {
+        val file = tmpFolder.newFile("delete-survive.preferences_pb")
+
+        val firstScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+        val first = DataStoreAddedAppsRepository(
+            PreferenceDataStoreFactory.create(scope = firstScope, produceFile = { file }),
+        )
+        first.add(AddedApp("com.example.foo", 30.minutes))
+        first.delete("com.example.foo")
+        runBlocking { firstScope.coroutineContext[Job]!!.cancelAndJoin() }
+
+        val survivor = DataStoreAddedAppsRepository(
+            PreferenceDataStoreFactory.create(scope = scope, produceFile = { file }),
+        )
+
+        assertEquals(emptyList<AddedApp>(), survivor.addedApps())
+    }
+
+    @Test
     fun `addedApps survives across repository instances backed by the same file`() {
         val file = tmpFolder.newFile("survive.preferences_pb")
 

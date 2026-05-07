@@ -12,6 +12,10 @@ sealed class Destination(val route: String) {
     // Modals
     data object AddApp : Destination("modal/add-app")
     data object AddHabit : Destination("modal/add-habit")
+    data object EditApp : Destination("modal/edit-app/{packageName}") {
+        const val ARG_PACKAGE_NAME = "packageName"
+        fun routeFor(packageName: String) = "modal/edit-app/$packageName"
+    }
 
     // Lock screen, opened from app list
     data object Lock : Destination("lock")

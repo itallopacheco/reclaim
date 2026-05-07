@@ -37,6 +37,13 @@ class DataStoreAddedAppsRepository(
         Unit
     }
 
+    override fun delete(packageName: String) = runBlocking {
+        dataStore.edit { prefs ->
+            prefs.remove(quotaKey(packageName))
+        }
+        Unit
+    }
+
     private fun quotaKey(packageName: String) = longPreferencesKey(QUOTA_KEY_PREFIX + packageName)
 
     private companion object {
