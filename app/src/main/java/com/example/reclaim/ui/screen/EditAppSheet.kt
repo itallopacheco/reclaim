@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -40,6 +41,7 @@ import com.example.reclaim.ui.theme.ReclaimInk
 import com.example.reclaim.ui.theme.ReclaimInk2
 import com.example.reclaim.ui.theme.ReclaimInk3
 import com.example.reclaim.ui.theme.ReclaimLine
+import com.example.reclaim.ui.theme.ReclaimRed
 import com.example.reclaim.ui.theme.ReclaimTeal
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
@@ -50,8 +52,10 @@ fun EditAppSheetContent(
     app: App,
     initialQuota: Duration,
     onSave: (Duration) -> Unit,
+    onRequestRemove: () -> Unit = {},
 ) {
     var quota by remember { mutableStateOf(initialQuota) }
+    var showRemoveDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -96,6 +100,38 @@ fun EditAppSheetContent(
                 onDecrease = { quota = (quota - QUOTA_STEP).coerceAtLeast(QUOTA_MIN) },
             )
         }
+        Spacer(Modifier.height(16.dp))
+        TextButton(onClick = { showRemoveDialog = true }) {
+            Text(
+                "Remove app",
+                color = ReclaimRed,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+            )
+        }
+    }
+
+    if (showRemoveDialog) {
+        AlertDialog(
+            onDismissRequest = { showRemoveDialog = false },
+            title = { Text("Remove ${app.displayName}?") },
+            confirmButton = {
+                TextButton(
+                    onClick = { showRemoveDialog = false; onRequestRemove() },
+                    modifier = Modifier.semantics { contentDescription = "Confirm remove app" },
+                ) {
+                    Text("Remove", color = ReclaimRed, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showRemoveDialog = false },
+                    modifier = Modifier.semantics { contentDescription = "Cancel remove app" },
+                ) {
+                    Text("Cancel", color = ReclaimInk2)
+                }
+            },
+        )
     }
 }
 

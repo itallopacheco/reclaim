@@ -72,4 +72,68 @@ class EditAppSheetTest {
             }
         }
     }
+
+    @Test
+    fun tappingRemoveAppShowsConfirmationDialog() {
+        composeRule.setContent {
+            ReclaimTheme {
+                EditAppSheetContent(
+                    app = App("com.google.youtube", "YouTube", isLauncherApp = true),
+                    initialQuota = 1.hours,
+                    onSave = {},
+                    onRequestRemove = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Remove app").performClick()
+
+        composeRule.onNodeWithText("Remove YouTube?").assertIsDisplayed()
+    }
+
+    @Test
+    fun confirmingRemovalCallsOnRequestRemove() {
+        var removeRequested = false
+
+        composeRule.setContent {
+            ReclaimTheme {
+                EditAppSheetContent(
+                    app = App("com.google.youtube", "YouTube", isLauncherApp = true),
+                    initialQuota = 1.hours,
+                    onSave = {},
+                    onRequestRemove = { removeRequested = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Remove app").performClick()
+        composeRule.onNodeWithContentDescription("Confirm remove app").performClick()
+
+        composeRule.runOnIdle {
+            assert(removeRequested) { "expected onRequestRemove to be called" }
+        }
+    }
+
+    @Test
+    fun cancellingRemovalDoesNotCallOnRequestRemove() {
+        var removeRequested = false
+
+        composeRule.setContent {
+            ReclaimTheme {
+                EditAppSheetContent(
+                    app = App("com.google.youtube", "YouTube", isLauncherApp = true),
+                    initialQuota = 1.hours,
+                    onSave = {},
+                    onRequestRemove = { removeRequested = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Remove app").performClick()
+        composeRule.onNodeWithContentDescription("Cancel remove app").performClick()
+
+        composeRule.runOnIdle {
+            assert(!removeRequested) { "onRequestRemove must not be called on Cancel" }
+        }
+    }
 }
