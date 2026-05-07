@@ -63,7 +63,9 @@ fun ReclaimNavHost(
                 onFabClick = { navController.navigate(Destination.AddApp.route) }
             ) {
                 AppsScreen(
-                    onAppClick = { _ -> navController.navigate(Destination.Lock.route) }
+                    addedApps = InMemoryAddedAppsRepository,
+                    catalog = DemoAppCatalog,
+                    onAppClick = { _ -> navController.navigate(Destination.Lock.route) },
                 )
             }
         }
