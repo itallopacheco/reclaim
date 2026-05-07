@@ -227,6 +227,40 @@ class AddAppSheetTest {
     }
 
     @Test
+    fun savePersistsTheSelectedAppWithChosenQuota() {
+        val instagram = App("com.instagram.android", "Instagram", isLauncherApp = true)
+        val repo = FakeAddedAppsRepository()
+        val catalog = FakeAppCatalog(listOf(instagram))
+        val usage = FakeUsageStats(mapOf(instagram.packageName to 60.minutes))
+        var savedCalled = false
+
+        composeRule.setContent {
+            ReclaimTheme {
+                AddAppSheetContent(
+                    suggestApps = SuggestAppsUseCase(catalog, usage, repo),
+                    searchApps = SearchAppsUseCase(catalog, repo),
+                    addedApps = repo,
+                    onDismiss = {},
+                    onSaved = { savedCalled = true },
+                    initialQuota = 1.hours + 30.minutes,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Instagram").performClick()
+        composeRule.onNodeWithText("Save").performClick()
+
+        composeRule.runOnIdle {
+            assert(savedCalled) { "onSaved was not invoked" }
+            val added = repo.addedApps()
+            assert(added.size == 1) { "expected 1 added app, got ${added.size}" }
+            assert(added[0] == AddedApp(instagram.packageName, 1.hours + 30.minutes)) {
+                "wrong added app: ${added[0]}"
+            }
+        }
+    }
+
+    @Test
     fun alreadyAddedAppsAreHiddenFromBothLists() {
         val instagram = App("com.instagram.android", "Instagram", isLauncherApp = true)
         val whatsapp = App("com.whatsapp", "WhatsApp", isLauncherApp = true)

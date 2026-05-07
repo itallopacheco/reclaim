@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.reclaim.domain.apps.AddedApp
 import com.example.reclaim.domain.apps.AddedAppsRepository
 import com.example.reclaim.domain.apps.App
 import com.example.reclaim.domain.apps.SearchAppsUseCase
@@ -114,7 +115,11 @@ fun AddAppSheetContent(
         Header(
             saveEnabled = selectedApp != null,
             onCancel = onDismiss,
-            onSave = onSaved,
+            onSave = {
+                val app = selectedApp ?: return@Header
+                addedApps.add(AddedApp(app.packageName, quota))
+                onSaved()
+            },
         )
         Spacer(Modifier.height(20.dp))
         SearchField(query = query, onQueryChange = { query = it })
