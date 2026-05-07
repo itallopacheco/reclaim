@@ -41,6 +41,18 @@ class SuggestAppsUseCaseTest {
     }
 
     @Test
+    fun `caps suggestions at top 10`() {
+        val apps = (1..12).map { App("com.app$it", "App $it", isLauncherApp = true) }
+        val catalog = FakeAppCatalog(apps)
+        val usageStats = FakeUsageStats(apps.mapIndexed { idx, app -> app.packageName to (idx + 1).minutes }.toMap())
+        val addedRepo = FakeAddedAppsRepository()
+
+        val result = SuggestAppsUseCase(catalog, usageStats, addedRepo).invoke()
+
+        assertEquals(10, result.size)
+    }
+
+    @Test
     fun `excludes apps without launcher icon`() {
         val catalog = FakeAppCatalog(
             listOf(

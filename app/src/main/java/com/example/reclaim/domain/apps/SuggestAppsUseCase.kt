@@ -16,5 +16,10 @@ class SuggestAppsUseCase(
             .map { SuggestedApp(it, usage.getValue(it.packageName)) }
             .filter { it.avgDaily > Duration.ZERO }
             .sortedByDescending { it.avgDaily }
+            .take(MAX_SUGGESTIONS)
+    }
+
+    private companion object {
+        const val MAX_SUGGESTIONS = 10
     }
 }
