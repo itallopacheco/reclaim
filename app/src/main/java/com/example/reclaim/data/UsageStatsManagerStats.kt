@@ -5,6 +5,7 @@ import android.app.usage.UsageStatsManager
 import android.os.Process
 import com.example.reclaim.domain.apps.UsageStats
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 class UsageStatsManagerStats(
     private val usageStatsManager: UsageStatsManager,
@@ -14,7 +15,15 @@ class UsageStatsManagerStats(
 
     override fun avgDailyUsageLast7Days(): Map<String, Duration> {
         if (!hasUsageAccess()) return emptyMap()
-        return emptyMap()
+        val now = System.currentTimeMillis()
+        val weekAgo = now - WEEK_MILLIS
+        val raw = usageStatsManager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, weekAgo, now)
+            ?: return emptyMap()
+        return raw
+            .groupBy { it.packageName }
+            .mapValues { (_, entries) ->
+                (entries.sumOf { it.totalTimeInForeground } / DAYS_IN_WEEK).milliseconds
+            }
     }
 
     private fun hasUsageAccess(): Boolean {
@@ -24,5 +33,10 @@ class UsageStatsManagerStats(
             packageName,
         )
         return mode == AppOpsManager.MODE_ALLOWED
+    }
+
+    private companion object {
+        const val DAYS_IN_WEEK = 7L
+        const val WEEK_MILLIS = DAYS_IN_WEEK * 24 * 60 * 60 * 1000
     }
 }
