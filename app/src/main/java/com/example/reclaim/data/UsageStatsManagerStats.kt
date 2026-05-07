@@ -26,7 +26,7 @@ class UsageStatsManagerStats(
             }
     }
 
-    private fun hasUsageAccess(): Boolean {
+    fun hasUsageAccess(): Boolean {
         val mode = appOpsManager.checkOpNoThrow(
             AppOpsManager.OPSTR_GET_USAGE_STATS,
             Process.myUid(),

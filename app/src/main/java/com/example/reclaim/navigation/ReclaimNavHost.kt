@@ -1,7 +1,13 @@
 package com.example.reclaim.navigation
 
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -23,7 +29,13 @@ import com.example.reclaim.ui.screen.OnboardingValueScreen
 fun ReclaimNavHost(
     navController: NavHostController = rememberNavController()
 ) {
-    val app = LocalContext.current.reclaimApplication()
+    val context = LocalContext.current
+    val app = context.reclaimApplication()
+    val openUsageAccess: () -> Unit = {
+        context.startActivity(
+            Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
     NavHost(
         navController = navController,
         startDestination = Destination.OnboardingValue.route
@@ -35,9 +47,12 @@ fun ReclaimNavHost(
             )
         }
         composable(Destination.OnboardingPermissions.route) {
+            OnResume {
+                if (app.usageStats.hasUsageAccess()) navController.enterMainApp()
+            }
             OnboardingPermissionsScreen(
-                onGranted = { navController.enterMainApp() },
-                onSkip = { navController.enterMainApp() }
+                onOpenUsageAccess = openUsageAccess,
+                onSkip = { navController.enterMainApp() },
             )
         }
 
@@ -81,10 +96,13 @@ fun ReclaimNavHost(
         // ---------- Modals (rendered as separate destinations; the bottom sheet
         // dismisses by popping back to the previous destination) ----------
         composable(Destination.AddApp.route) {
+            OnResume { app.appCatalog.invalidate() }
             AddAppSheet(
                 suggestApps = app.suggestApps,
                 searchApps = app.searchApps,
                 addedApps = app.addedApps,
+                hasUsageAccess = { app.usageStats.hasUsageAccess() },
+                onOpenUsageAccess = openUsageAccess,
                 onDismiss = { navController.popBackStack() },
                 onSaved = { navController.popBackStack() },
             )
@@ -117,5 +135,17 @@ private fun NavHostController.enterMainApp() {
     navigate(Destination.Home.route) {
         popUpTo(graph.findStartDestination().id) { inclusive = true }
         launchSingleTop = true
+    }
+}
+
+@Composable
+private fun OnResume(action: () -> Unit) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) action()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 }

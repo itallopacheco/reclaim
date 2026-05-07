@@ -11,10 +11,8 @@ import com.example.reclaim.data.DataStoreAddedAppsRepository
 import com.example.reclaim.data.PackageManagerAppCatalog
 import com.example.reclaim.data.UsageStatsManagerStats
 import com.example.reclaim.domain.apps.AddedAppsRepository
-import com.example.reclaim.domain.apps.AppCatalog
 import com.example.reclaim.domain.apps.SearchAppsUseCase
 import com.example.reclaim.domain.apps.SuggestAppsUseCase
-import com.example.reclaim.domain.apps.UsageStats
 
 private val Context.addedAppsDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "added_apps",
@@ -26,7 +24,7 @@ class ReclaimApplication : Application() {
         PackageManagerAppCatalog(packageManager, ownPackageName = packageName)
     }
 
-    val usageStats: UsageStats by lazy {
+    val usageStats: UsageStatsManagerStats by lazy {
         UsageStatsManagerStats(
             usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager,
             appOpsManager = getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager,
