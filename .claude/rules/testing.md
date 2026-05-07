@@ -9,12 +9,11 @@ paths:
 
 ## Current state
 
-Only the default Android Studio scaffolding is committed:
+Real tests live in `app/src/test/java/com/example/reclaim/domain/apps/` covering the use cases (`SuggestAppsUseCase`, `SearchAppsUseCase`). Hand-rolled fakes in a `fakes/` subpackage stand in for the interfaces. Pure JVM, no Android framework.
 
-- `app/src/test/java/com/example/reclaim/ExampleUnitTest.kt` — JVM unit test
-- `app/src/androidTest/java/com/example/reclaim/ExampleInstrumentedTest.kt` — instrumented test
+The default `ExampleUnitTest` and `ExampleInstrumentedTest` scaffolding files are still there — they validate the toolchain. Don't delete them.
 
-No domain logic exists yet, so there are no real tests to mirror. Don't delete the scaffolding files — they validate the test toolchain works.
+No Compose UI tests have been written yet. The PRDs for fatias B and C call for them; they'll land in `app/src/androidTest/`.
 
 ## Frameworks available
 
@@ -27,13 +26,27 @@ No domain logic exists yet, so there are no real tests to mirror. Don't delete t
 
 - **Unit tests** (no Android framework): `app/src/test/java/com/example/reclaim/...`. Mirror the `main` package structure.
 - **Compose UI tests**: `app/src/androidTest/java/com/example/reclaim/...` using `createComposeRule()`. Wrap the subject under `ReclaimTheme { ... }` so colors resolve.
+- **Robolectric tests** (when fatia C lands): `app/src/test/java/com/example/reclaim/data/...`. Robolectric stays out of `domain/` — those tests are pure JVM.
+
+## Domain test conventions
+
+For tests under `domain/`, see `domain.md`. Highlights:
+
+- Test class = `<Subject>Test` in the same package as production
+- Method names use Kotlin backticks (`fun \`does the thing\`()`)
+- Hand-rolled fakes in `fakes/`, one file per interface, constructor-injected immutable state
+- One behavior per test, one assertion per test
+- No mocking framework
 
 ## Running
 
 ```bash
-./gradlew test                    # all JVM unit tests
+./gradlew test                    # all JVM unit tests (debug + release variants)
+./gradlew :app:testDebugUnitTest  # debug variant only — what you want during TDD
 ./gradlew connectedAndroidTest    # instrumented + Compose UI tests (needs device/emulator)
-./gradlew :app:testDebugUnitTest  # debug variant only
+
+# Run a single test class (TDD loop):
+./gradlew :app:testDebugUnitTest --tests "com.example.reclaim.domain.apps.SuggestAppsUseCaseTest"
 ```
 
 ## When to write tests
