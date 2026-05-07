@@ -49,4 +49,14 @@ class DataStoreAddedAppsRepositoryTest {
 
         assertEquals(listOf(AddedApp("com.example.foo", 30.minutes)), repository.addedApps())
     }
+
+    @Test
+    fun `adding the same packageName twice keeps a single entry with the latest quota`() {
+        val repository = DataStoreAddedAppsRepository(newDataStore())
+
+        repository.add(AddedApp("com.example.foo", 30.minutes))
+        repository.add(AddedApp("com.example.foo", 45.minutes))
+
+        assertEquals(listOf(AddedApp("com.example.foo", 45.minutes)), repository.addedApps())
+    }
 }
