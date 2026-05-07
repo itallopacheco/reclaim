@@ -99,4 +99,30 @@ class AddAppSheetTest {
         composeRule.onNodeWithContentDescription("Increase quota").performClick()
         composeRule.onNodeWithContentDescription("Increase quota").assertIsNotEnabled()
     }
+
+    @Test
+    fun quotaStepperMinusButtonStopsAt15min() {
+        val instagram = App("com.instagram.android", "Instagram", isLauncherApp = true)
+        val repo = FakeAddedAppsRepository()
+        val catalog = FakeAppCatalog(listOf(instagram))
+        val usage = FakeUsageStats(mapOf(instagram.packageName to 60.minutes))
+
+        composeRule.setContent {
+            ReclaimTheme {
+                AddAppSheetContent(
+                    suggestApps = SuggestAppsUseCase(catalog, usage, repo),
+                    searchApps = SearchAppsUseCase(catalog, repo),
+                    addedApps = repo,
+                    onDismiss = {},
+                    onSaved = {},
+                    initialQuota = 30.minutes,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Instagram").performClick()
+        // 30m - 15m = 15m, then minus must be disabled
+        composeRule.onNodeWithContentDescription("Decrease quota").performClick()
+        composeRule.onNodeWithContentDescription("Decrease quota").assertIsNotEnabled()
+    }
 }
