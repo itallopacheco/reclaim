@@ -105,6 +105,25 @@ class SuggestAppsUseCaseTest {
     }
 
     @Test
+    fun `excludes apps that are not present in the usage map`() {
+        val catalog = FakeAppCatalog(
+            listOf(
+                App("com.a", "Alpha", isLauncherApp = true),
+                App("com.b", "Beta", isLauncherApp = true),
+            )
+        )
+        val usageStats = FakeUsageStats(mapOf("com.a" to 60.minutes))
+        val addedRepo = FakeAddedAppsRepository()
+
+        val result = SuggestAppsUseCase(catalog, usageStats, addedRepo).invoke()
+
+        assertEquals(
+            listOf(SuggestedApp(App("com.a", "Alpha", isLauncherApp = true), 60.minutes)),
+            result,
+        )
+    }
+
+    @Test
     fun `excludes apps with zero avg daily usage`() {
         val catalog = FakeAppCatalog(
             listOf(

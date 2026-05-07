@@ -28,15 +28,42 @@ class SuggestAppsUseCase(
 
 ## Entities
 
-- Always `data class` for entities (`App`, `SuggestedApp`). `assertEquals` on lists relies on structural equality.
+- Always `data class` for entities (`App`, `SuggestedApp`, `AddedApp`). `assertEquals` on lists relies on structural equality.
 - One file per type, even when small.
 - Fields are immutable `val`. No mutation in the domain.
 
+Current entities:
+
+```kotlin
+data class App(val packageName: String, val displayName: String, val isLauncherApp: Boolean)
+data class SuggestedApp(val app: App, val avgDaily: Duration)
+data class AddedApp(val packageName: String, val dailyQuota: Duration)
+```
+
 ## Interfaces
 
-- One method per interface, named for what it returns (`installedApps()`, `avgDailyUsageLast7Days()`, `addedPackageNames()`). No `get` prefix — Kotlin convention.
+- One method per interface where possible, named for what it returns (`installedApps()`, `avgDailyUsageLast7Days()`, `addedApps()`). No `get` prefix — Kotlin convention.
 - Return types are read-only collections (`List`, `Set`, `Map`).
 - The interface lives next to the use cases that consume it. Move only if a second consumer appears.
+
+Current interfaces:
+
+```kotlin
+interface AppCatalog {
+    fun installedApps(): List<App>
+}
+
+interface UsageStats {
+    fun avgDailyUsageLast7Days(): Map<String, Duration>
+}
+
+interface AddedAppsRepository {
+    fun addedApps(): List<AddedApp>
+    fun add(addedApp: AddedApp)
+}
+```
+
+`AddedAppsRepository` is the only interface with a write method. `add` is idempotent by `packageName` (replace, don't accumulate) — the contract belongs to implementations in `data/`, not the domain itself.
 
 ## What the domain does NOT decide
 

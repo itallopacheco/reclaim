@@ -29,10 +29,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,10 +65,15 @@ fun AddAppSheet(
     suggestApps: SuggestAppsUseCase,
     searchApps: SearchAppsUseCase,
     addedApps: AddedAppsRepository,
+    hasUsageAccess: () -> Boolean,
+    onOpenUsageAccess: () -> Unit,
     onDismiss: () -> Unit,
     onSaved: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var permissionGrantedTick by remember { mutableStateOf(0) }
+    OnResume { permissionGrantedTick++ }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -75,6 +84,9 @@ fun AddAppSheet(
             suggestApps = suggestApps,
             searchApps = searchApps,
             addedApps = addedApps,
+            hasUsageAccess = hasUsageAccess(),
+            onOpenUsageAccess = onOpenUsageAccess,
+            reloadKey = permissionGrantedTick,
             onDismiss = onDismiss,
             onSaved = onSaved,
         )
@@ -88,6 +100,9 @@ fun AddAppSheetContent(
     addedApps: AddedAppsRepository,
     onDismiss: () -> Unit,
     onSaved: () -> Unit,
+    hasUsageAccess: Boolean = true,
+    onOpenUsageAccess: () -> Unit = {},
+    reloadKey: Int = 0,
     initialQuota: Duration = QUOTA_DEFAULT,
 ) {
     var selectedApp by remember { mutableStateOf<App?>(null) }
@@ -101,8 +116,8 @@ fun AddAppSheetContent(
         }
         selectedApp = app
     }
-    val suggestions = remember(selectedApp) { suggestApps.invoke() }
-    val searchResults = remember(query, selectedApp) {
+    val suggestions = remember(selectedApp, reloadKey) { suggestApps.invoke() }
+    val searchResults = remember(query, selectedApp, reloadKey) {
         if (query.isEmpty()) emptyList() else searchApps.invoke(query)
     }
 
@@ -140,12 +155,16 @@ fun AddAppSheetContent(
         if (query.isEmpty()) {
             SectionLabel("SUGGESTED · MOST USED")
             Spacer(Modifier.height(12.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                suggestions.forEach { suggestion ->
-                    SuggestedAppRow(
-                        app = suggestion.app,
-                        onClick = { selectApp(suggestion.app) },
-                    )
+            if (!hasUsageAccess) {
+                UsageAccessCta(onOpenUsageAccess = onOpenUsageAccess)
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    suggestions.forEach { suggestion ->
+                        SuggestedAppRow(
+                            app = suggestion.app,
+                            onClick = { selectApp(suggestion.app) },
+                        )
+                    }
                 }
             }
         } else {
@@ -383,6 +402,43 @@ private fun SuggestedAppRow(app: App, onClick: () -> Unit) {
             fontSize = 14.5.sp,
             fontWeight = FontWeight.SemiBold,
         )
+    }
+}
+
+@Composable
+private fun UsageAccessCta(onOpenUsageAccess: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color.White)
+            .clickable(onClick = onOpenUsageAccess)
+            .padding(16.dp),
+    ) {
+        Text(
+            text = "Allow access to suggest apps",
+            color = ReclaimInk,
+            fontSize = 14.5.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(Modifier.size(4.dp))
+        Text(
+            text = "Tap to open Settings → Usage Access. Search still works without it.",
+            color = ReclaimInk3,
+            fontSize = 12.5.sp,
+        )
+    }
+}
+
+@Composable
+private fun OnResume(action: () -> Unit) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) action()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 }
 

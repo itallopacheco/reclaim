@@ -9,11 +9,12 @@ paths:
 
 ## Current state
 
-Real tests live in `app/src/test/java/com/example/reclaim/domain/apps/` covering the use cases (`SuggestAppsUseCase`, `SearchAppsUseCase`). Hand-rolled fakes in a `fakes/` subpackage stand in for the interfaces. Pure JVM, no Android framework.
+Two real test suites live in this repo:
+
+- **JVM domain tests** at `app/src/test/java/com/example/reclaim/domain/apps/` — 10 tests covering `SuggestAppsUseCase` and `SearchAppsUseCase`. Hand-rolled immutable fakes in `fakes/`. Pure JVM, no Android framework.
+- **Compose UI tests** at `app/src/androidTest/java/com/example/reclaim/ui/screen/` — 10 tests in `AddAppSheetTest.kt` covering the add-app modal end-to-end. Mutable in-memory fakes in `fakes/` (separate from the JVM ones because `androidTest` and `test` source sets don't share code).
 
 The default `ExampleUnitTest` and `ExampleInstrumentedTest` scaffolding files are still there — they validate the toolchain. Don't delete them.
-
-No Compose UI tests have been written yet. The PRDs for fatias B and C call for them; they'll land in `app/src/androidTest/`.
 
 ## Frameworks available
 
@@ -25,7 +26,7 @@ No Compose UI tests have been written yet. The PRDs for fatias B and C call for 
 ## Where new tests go
 
 - **Unit tests** (no Android framework): `app/src/test/java/com/example/reclaim/...`. Mirror the `main` package structure.
-- **Compose UI tests**: `app/src/androidTest/java/com/example/reclaim/...` using `createComposeRule()`. Wrap the subject under `ReclaimTheme { ... }` so colors resolve.
+- **Compose UI tests**: `app/src/androidTest/java/com/example/reclaim/...` using `createAndroidComposeRule<ComponentActivity>()`. Wrap the subject under `ReclaimTheme { ... }` so colors resolve.
 - **Robolectric tests** (when fatia C lands): `app/src/test/java/com/example/reclaim/data/...`. Robolectric stays out of `domain/` — those tests are pure JVM.
 
 ## Domain test conventions
@@ -45,9 +46,25 @@ For tests under `domain/`, see `domain.md`. Highlights:
 ./gradlew :app:testDebugUnitTest  # debug variant only — what you want during TDD
 ./gradlew connectedAndroidTest    # instrumented + Compose UI tests (needs device/emulator)
 
-# Run a single test class (TDD loop):
+# Run a single JVM test class (--tests is supported):
 ./gradlew :app:testDebugUnitTest --tests "com.example.reclaim.domain.apps.SuggestAppsUseCaseTest"
+
+# Run a single instrumented test class (--tests is NOT supported here):
+./gradlew :app:connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=com.example.reclaim.ui.screen.AddAppSheetTest
 ```
+
+**Locked-screen gotcha.** Running `connectedAndroidTest` against a locked device crashes with `IllegalStateException: No compose hierarchies found in the app...`. The error is misleading; the real cause is that the lock screen blocks the host Activity from launching. Always confirm the device is unlocked before running. JVM unit tests don't have this issue.
+
+## Compose UI test patterns
+
+Patterns proven on this codebase (Compose BOM 2024.09.00):
+
+- **Extract a `*Content` composable for testability.** A screen wrapped in `ModalBottomSheet`/`Scaffold` is hard to drive directly. Expose an inner `*Content` taking the same parameters. Production calls it from inside the wrapper; tests call it directly with `composeRule.setContent`.
+- **`contentDescription` belongs on the leaf semantics node, not the container.** A `BasicTextField` only takes focus when the semantics are on the field itself. `Modifier.semantics { contentDescription = "Search installed apps" }` goes on the `BasicTextField`, not its parent `Row`. `performTextInput` fails on a node that has no `RequestFocus` action.
+- **Use `onAllNodesWithText(text).assertCountEquals(0)`** to assert absence. `assertDoesNotExist` exists in newer Compose UI test versions but isn't on the current BOM.
+- **Pass test-only state as default-valued parameters.** `AddAppSheetContent(... initialQuota: Duration = QUOTA_DEFAULT)` lets the stepper-bound test reach 8h in one click instead of 28. Production keeps the default.
+- **Mutable fakes for instrumented tests.** Production calls `addedApps.add(...)` on Save; the fake must accept mutation. The JVM fakes are deliberately immutable — duplicate them as mutable for `androidTest` rather than sharing.
 
 ## When to write tests
 

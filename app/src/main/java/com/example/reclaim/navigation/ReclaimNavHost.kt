@@ -1,16 +1,22 @@
 package com.example.reclaim.navigation
 
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.eventFlow
+import kotlinx.coroutines.flow.filter
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.reclaim.data.DemoAppCatalog
-import com.example.reclaim.data.DemoUsageStats
-import com.example.reclaim.data.InMemoryAddedAppsRepository
-import com.example.reclaim.domain.apps.SearchAppsUseCase
-import com.example.reclaim.domain.apps.SuggestAppsUseCase
+import com.example.reclaim.reclaimApplication
 import com.example.reclaim.ui.main.MainScaffold
 import com.example.reclaim.ui.main.switchTab
 import com.example.reclaim.ui.screen.AddAppSheet
@@ -26,6 +32,13 @@ import com.example.reclaim.ui.screen.OnboardingValueScreen
 fun ReclaimNavHost(
     navController: NavHostController = rememberNavController()
 ) {
+    val context = LocalContext.current
+    val app = context.reclaimApplication()
+    val openUsageAccess: () -> Unit = {
+        context.startActivity(
+            Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
     NavHost(
         navController = navController,
         startDestination = Destination.OnboardingValue.route
@@ -37,9 +50,12 @@ fun ReclaimNavHost(
             )
         }
         composable(Destination.OnboardingPermissions.route) {
+            OnResumeDeferred {
+                if (app.usageStats.hasUsageAccess()) navController.enterMainApp()
+            }
             OnboardingPermissionsScreen(
-                onGranted = { navController.enterMainApp() },
-                onSkip = { navController.enterMainApp() }
+                onOpenUsageAccess = openUsageAccess,
+                onSkip = { navController.enterMainApp() },
             )
         }
 
@@ -63,8 +79,8 @@ fun ReclaimNavHost(
                 onFabClick = { navController.navigate(Destination.AddApp.route) }
             ) {
                 AppsScreen(
-                    addedApps = InMemoryAddedAppsRepository,
-                    catalog = DemoAppCatalog,
+                    addedApps = app.addedApps,
+                    catalog = app.appCatalog,
                     onAppClick = { _ -> navController.navigate(Destination.Lock.route) },
                 )
             }
@@ -83,17 +99,13 @@ fun ReclaimNavHost(
         // ---------- Modals (rendered as separate destinations; the bottom sheet
         // dismisses by popping back to the previous destination) ----------
         composable(Destination.AddApp.route) {
+            OnResume { app.appCatalog.invalidate() }
             AddAppSheet(
-                suggestApps = SuggestAppsUseCase(
-                    catalog = DemoAppCatalog,
-                    usageStats = DemoUsageStats,
-                    addedApps = InMemoryAddedAppsRepository,
-                ),
-                searchApps = SearchAppsUseCase(
-                    catalog = DemoAppCatalog,
-                    addedApps = InMemoryAddedAppsRepository,
-                ),
-                addedApps = InMemoryAddedAppsRepository,
+                suggestApps = app.suggestApps,
+                searchApps = app.searchApps,
+                addedApps = app.addedApps,
+                hasUsageAccess = { app.usageStats.hasUsageAccess() },
+                onOpenUsageAccess = openUsageAccess,
                 onDismiss = { navController.popBackStack() },
                 onSaved = { navController.popBackStack() },
             )
@@ -126,5 +138,35 @@ private fun NavHostController.enterMainApp() {
     navigate(Destination.Home.route) {
         popUpTo(graph.findStartDestination().id) { inclusive = true }
         launchSingleTop = true
+    }
+}
+
+/**
+ * Synchronous ON_RESUME hook. Action runs inside the LifecycleRegistry dispatch loop;
+ * use only for side effects that don't mutate the NavController back stack.
+ */
+@Composable
+private fun OnResume(action: () -> Unit) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) action()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+}
+
+/**
+ * Deferred ON_RESUME hook. Action runs on Main.immediate after the lifecycle dispatch
+ * has unwound, so it's safe to navigate from inside [action].
+ */
+@Composable
+private fun OnResumeDeferred(action: () -> Unit) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.lifecycle.eventFlow
+            .filter { it == Lifecycle.Event.ON_RESUME }
+            .collect { action() }
     }
 }

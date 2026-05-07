@@ -13,7 +13,7 @@ class SuggestAppsUseCase(
         return catalog.installedApps()
             .filter { it.isLauncherApp }
             .filter { it.packageName !in added }
-            .map { SuggestedApp(it, usage.getValue(it.packageName)) }
+            .mapNotNull { app -> usage[app.packageName]?.let { SuggestedApp(app, it) } }
             .filter { it.avgDaily > Duration.ZERO }
             .sortedByDescending { it.avgDaily }
             .take(MAX_SUGGESTIONS)

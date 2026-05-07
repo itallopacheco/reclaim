@@ -29,8 +29,15 @@ Version catalog: `gradle/libs.versions.toml`. Add new deps there, then reference
 During TDD, run a single test class to keep the loop tight:
 
 ```bash
+# JVM unit test (--tests is supported by JUnit Gradle):
 ./gradlew :app:testDebugUnitTest --tests "com.example.reclaim.domain.apps.SuggestAppsUseCaseTest"
+
+# Instrumented / Compose UI test (--tests is NOT supported here):
+./gradlew :app:connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=com.example.reclaim.ui.screen.AddAppSheetTest
 ```
+
+> Instrumented tests need the device unlocked. The "No compose hierarchies found" error from `connectedAndroidTest` usually means the lock screen blocked the host Activity from launching, not a real Compose problem. Unlock and re-run.
 
 Launch after install: `adb shell am start -n com.example.reclaim/.MainActivity`.
 
@@ -46,10 +53,14 @@ app/src/main/java/com/example/reclaim/
 │   └── ReclaimNavHost.kt        # NavHost wiring; screens get callbacks, not NavController
 ├── domain/
 │   └── apps/                    # pure-JVM domain layer for the "added apps" feature
-│       ├── App.kt, SuggestedApp.kt
+│       ├── App.kt, SuggestedApp.kt, AddedApp.kt
 │       ├── AppCatalog.kt, UsageStats.kt, AddedAppsRepository.kt   # interfaces
 │       ├── SuggestAppsUseCase.kt
 │       └── SearchAppsUseCase.kt
+├── data/                        # adapters that implement the domain interfaces
+│   ├── DemoAppCatalog.kt        # static list of 10 popular apps (bootstrap; replaced in fatia C)
+│   ├── DemoUsageStats.kt        # static avg-usage map matching the demo catalog
+│   └── InMemoryAddedAppsRepository.kt   # process-lifetime store; idempotent add() by packageName
 └── ui/
     ├── main/
     │   └── MainScaffold.kt      # tab bar host (Home / Apps / Habits) + FAB
@@ -70,9 +81,9 @@ Start destination is `Destination.OnboardingValue`. After onboarding, `Destinati
 
 Three loose layers. No DI framework yet, no ViewModels yet.
 
-- **`ui/`** — Compose screens and the tab scaffold. Screens are pure presentation: state via `remember`, navigation via callbacks.
-- **`domain/`** — pure Kotlin/JVM. Use cases (`class Foo(deps...) { fun invoke(...) }`) operating on data classes (`App`, `SuggestedApp`). Dependencies are interfaces (`AppCatalog`, `UsageStats`, `AddedAppsRepository`) — implementations live elsewhere (today: nowhere; later: in `data/`).
-- **`data/`** — does not exist yet. Will hold `PackageManagerAppCatalog`, `UsageStatsManagerStats`, `DataStoreAddedAppsRepository` (fatia C). Filters that depend on real-world knowledge (e.g. excluding Reclaim's own package) belong here, **not** in the domain.
+- **`ui/`** — Compose screens and the tab scaffold. Screens are pure presentation: state via `remember`, navigation via callbacks. Screens consume domain interfaces directly (constructor parameters), no ViewModel layer.
+- **`domain/`** — pure Kotlin/JVM. Use cases (`class Foo(deps...) { fun invoke(...) }`) operating on data classes (`App`, `SuggestedApp`, `AddedApp`). Dependencies are interfaces (`AppCatalog`, `UsageStats`, `AddedAppsRepository`).
+- **`data/`** — adapters implementing the domain interfaces. Today: `Demo*` static singletons + `InMemoryAddedAppsRepository`. Fatia C will swap these for `PackageManagerAppCatalog`, `UsageStatsManagerStats`, `DataStoreAddedAppsRepository`. Filters that depend on real-world knowledge (e.g. excluding Reclaim's own package) belong here, **not** in the domain.
 
 Domain code is tested in pure JVM with hand-rolled fakes in `app/src/test/.../domain/apps/fakes/`. No mocking framework, no Robolectric in the domain tests.
 
@@ -94,27 +105,41 @@ Domain code is tested in pure JVM with hand-rolled fakes in `app/src/test/.../do
 
 ## Tests
 
-JUnit4 for JVM unit tests, `androidx.compose.ui:ui-test-junit4` available for Compose UI tests.
+JUnit4 for JVM unit tests, `androidx.compose.ui:ui-test-junit4` for Compose UI tests on a real device.
 
 Layout:
 
 ```
 app/src/test/java/com/example/reclaim/
 └── domain/apps/
-    ├── SuggestAppsUseCaseTest.kt
-    ├── SearchAppsUseCaseTest.kt
+    ├── SuggestAppsUseCaseTest.kt          # 6 tests
+    ├── SearchAppsUseCaseTest.kt           # 4 tests
     └── fakes/
         ├── FakeAppCatalog.kt
         ├── FakeUsageStats.kt
         └── FakeAddedAppsRepository.kt
+
+app/src/androidTest/java/com/example/reclaim/ui/screen/
+├── AddAppSheetTest.kt                     # 10 Compose UI tests
+└── fakes/                                 # in-memory mutable fakes for UI
+    ├── FakeAppCatalog.kt
+    ├── FakeUsageStats.kt
+    └── FakeAddedAppsRepository.kt
 ```
 
-The default `ExampleUnitTest` and `ExampleInstrumentedTest` scaffolding are kept — they validate the toolchain. Real tests today are in `domain/apps/`.
+The default `ExampleUnitTest` and `ExampleInstrumentedTest` scaffolding are kept — they validate the toolchain.
 
 Conventions:
 
 - Test class name = `<Subject>Test`, same package as production code
-- Test method names use Kotlin backticked descriptions (`fun \`excludes apps with zero avg daily usage\`()`)
-- Fakes live in a `fakes/` subpackage, one file per interface
+- Test method names use Kotlin backticked descriptions for JVM tests (`fun \`excludes apps with zero avg daily usage\`()`); camelCase for instrumented tests works fine too
+- Fakes live in a `fakes/` subpackage of the source set, one file per interface
 - Domain tests stay JVM-only — no Android framework, no Robolectric
-- Compose UI tests (when written) go to `app/src/androidTest/` and wrap subjects in `ReclaimTheme { ... }` so colors resolve
+- Compose UI tests use `createAndroidComposeRule<ComponentActivity>()` and wrap subjects in `ReclaimTheme { ... }`
+
+UI test patterns that work in this codebase:
+
+- **Extract a `*Content` composable.** A screen wrapped in `ModalBottomSheet` (or a `Scaffold`) is hard to test directly. Expose an inner `*Content` composable that takes the same parameters and call it from the test with `composeRule.setContent`. The wrapper composable still calls it in production.
+- **Place `contentDescription` on the leaf node, not the container.** A `BasicTextField` inside a `Row` only receives focus if the semantics are on the field itself. `Modifier.semantics { contentDescription = "Search installed apps" }` goes on the `BasicTextField`, not the surrounding `Row`.
+- **Use `onAllNodesWithText(text).assertCountEquals(0)`** to assert absence. `assertDoesNotExist` exists in newer Compose UI test versions but isn't in the current BOM.
+- **Pass test-only state as default-valued parameters.** Stepper bound tests use `initialQuota = 7.hours + 45.minutes` so the test reaches the upper bound in one click instead of 28.
