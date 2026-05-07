@@ -92,6 +92,14 @@ fun AddAppSheetContent(
     var selectedApp by remember { mutableStateOf<App?>(null) }
     var quota by remember { mutableStateOf(initialQuota) }
     var query by remember { mutableStateOf("") }
+
+    fun selectApp(app: App) {
+        val previous = selectedApp
+        if (previous != null && previous.packageName != app.packageName) {
+            quota = QUOTA_DEFAULT
+        }
+        selectedApp = app
+    }
     val suggestions = remember(selectedApp) { suggestApps.invoke() }
     val searchResults = remember(query, selectedApp) {
         if (query.isEmpty()) emptyList() else searchApps.invoke(query)
@@ -131,7 +139,7 @@ fun AddAppSheetContent(
                 suggestions.forEach { suggestion ->
                     SuggestedAppRow(
                         app = suggestion.app,
-                        onClick = { selectedApp = suggestion.app },
+                        onClick = { selectApp(suggestion.app) },
                     )
                 }
             }
@@ -148,7 +156,7 @@ fun AddAppSheetContent(
                     searchResults.forEach { app ->
                         SuggestedAppRow(
                             app = app,
-                            onClick = { selectedApp = app },
+                            onClick = { selectApp(app) },
                         )
                     }
                 }

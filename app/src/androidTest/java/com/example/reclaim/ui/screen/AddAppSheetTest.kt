@@ -165,6 +165,41 @@ class AddAppSheetTest {
     }
 
     @Test
+    fun switchingSelectedAppResetsQuotaToDefault() {
+        val instagram = App("com.instagram.android", "Instagram", isLauncherApp = true)
+        val whatsapp = App("com.whatsapp", "WhatsApp", isLauncherApp = true)
+        val repo = FakeAddedAppsRepository()
+        val catalog = FakeAppCatalog(listOf(instagram, whatsapp))
+        val usage = FakeUsageStats(
+            mapOf(
+                instagram.packageName to 60.minutes,
+                whatsapp.packageName to 30.minutes,
+            )
+        )
+
+        composeRule.setContent {
+            ReclaimTheme {
+                AddAppSheetContent(
+                    suggestApps = SuggestAppsUseCase(catalog, usage, repo),
+                    searchApps = SearchAppsUseCase(catalog, repo),
+                    addedApps = repo,
+                    onDismiss = {},
+                    onSaved = {},
+                    initialQuota = 2.hours + 30.minutes,
+                )
+            }
+        }
+
+        // Pick Instagram (quota will start at 2h 30m).
+        composeRule.onNodeWithText("Instagram").performClick()
+        composeRule.onNodeWithText("2h 30m").assertIsDisplayed()
+
+        // Switch to WhatsApp; quota must reset to default 1h 00m.
+        composeRule.onNodeWithText("WhatsApp").performClick()
+        composeRule.onNodeWithText("1h 00m").assertIsDisplayed()
+    }
+
+    @Test
     fun searchWithoutMatchesShowsNoMatchesText() {
         val instagram = App("com.instagram.android", "Instagram", isLauncherApp = true)
         val repo = FakeAddedAppsRepository()
