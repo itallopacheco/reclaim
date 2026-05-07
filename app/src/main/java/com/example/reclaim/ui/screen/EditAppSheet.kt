@@ -18,9 +18,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.reclaim.domain.apps.App
+import com.example.reclaim.ui.theme.ReclaimBg
 import com.example.reclaim.ui.theme.ReclaimInk
 import com.example.reclaim.ui.theme.ReclaimInk2
 import com.example.reclaim.ui.theme.ReclaimInk3
@@ -47,12 +51,39 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditAppSheet(
+    app: App,
+    initialQuota: Duration,
+    onDismiss: () -> Unit,
+    onSave: (Duration) -> Unit,
+    onRequestRemove: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = ReclaimBg,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+    ) {
+        EditAppSheetContent(
+            app = app,
+            initialQuota = initialQuota,
+            onSave = onSave,
+            onRequestRemove = onRequestRemove,
+            onCancel = onDismiss,
+        )
+    }
+}
+
 @Composable
 fun EditAppSheetContent(
     app: App,
     initialQuota: Duration,
     onSave: (Duration) -> Unit,
     onRequestRemove: () -> Unit = {},
+    onCancel: () -> Unit = {},
 ) {
     var quota by remember { mutableStateOf(initialQuota) }
     var showRemoveDialog by remember { mutableStateOf(false) }
@@ -64,7 +95,7 @@ fun EditAppSheetContent(
             .padding(bottom = 24.dp),
     ) {
         Header(
-            onCancel = {},
+            onCancel = onCancel,
             onSave = { onSave(quota) },
         )
         Spacer(Modifier.height(20.dp))
