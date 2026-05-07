@@ -29,4 +29,19 @@ class EditAppSheetTest {
 
         composeRule.onNodeWithText("YouTube").assertIsDisplayed()
     }
+
+    @Test
+    fun rendersInitialQuota() {
+        composeRule.setContent {
+            ReclaimTheme {
+                EditAppSheetContent(
+                    app = App("com.google.youtube", "YouTube", isLauncherApp = true),
+                    initialQuota = 1.hours,
+                    onSave = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("1h 00m").assertIsDisplayed()
+    }
 }

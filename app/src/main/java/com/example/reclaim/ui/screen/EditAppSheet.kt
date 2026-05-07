@@ -12,4 +12,12 @@ fun EditAppSheetContent(
     onSave: (Duration) -> Unit,
 ) {
     Text(app.displayName)
+    Text(formatQuota(initialQuota))
+}
+
+private fun formatQuota(quota: Duration): String {
+    val totalMinutes = quota.inWholeMinutes
+    val h = totalMinutes / 60
+    val m = totalMinutes % 60
+    return "%dh %02dm".format(h, m)
 }
