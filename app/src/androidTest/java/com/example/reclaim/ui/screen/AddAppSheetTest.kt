@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import com.example.reclaim.domain.apps.App
 import com.example.reclaim.domain.apps.SearchAppsUseCase
@@ -222,5 +223,31 @@ class AddAppSheetTest {
             .performTextInput("xyz")
 
         composeRule.onNodeWithText("No matches").assertIsDisplayed()
+    }
+
+    @Test
+    fun clearingSearchRestoresSuggestedSection() {
+        val instagram = App("com.instagram.android", "Instagram", isLauncherApp = true)
+        val repo = FakeAddedAppsRepository()
+        val catalog = FakeAppCatalog(listOf(instagram))
+        val usage = FakeUsageStats(mapOf(instagram.packageName to 60.minutes))
+
+        composeRule.setContent {
+            ReclaimTheme {
+                AddAppSheetContent(
+                    suggestApps = SuggestAppsUseCase(catalog, usage, repo),
+                    searchApps = SearchAppsUseCase(catalog, repo),
+                    addedApps = repo,
+                    onDismiss = {},
+                    onSaved = {},
+                )
+            }
+        }
+
+        val searchField = composeRule.onNodeWithContentDescription("Search installed apps")
+        searchField.performTextInput("xyz")
+        composeRule.onAllNodesWithText("SUGGESTED · MOST USED").assertCountEquals(0)
+        searchField.performTextClearance()
+        composeRule.onNodeWithText("SUGGESTED · MOST USED").assertIsDisplayed()
     }
 }
