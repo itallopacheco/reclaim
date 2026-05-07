@@ -9,7 +9,7 @@ class SuggestAppsUseCase(
 ) {
     fun invoke(): List<SuggestedApp> {
         val usage = usageStats.avgDailyUsageLast7Days()
-        val added = addedApps.addedPackageNames()
+        val added = addedApps.addedApps().mapTo(HashSet()) { it.packageName }
         return catalog.installedApps()
             .filter { it.isLauncherApp }
             .filter { it.packageName !in added }

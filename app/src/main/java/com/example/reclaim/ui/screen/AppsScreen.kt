@@ -1,8 +1,10 @@
 package com.example.reclaim.ui.screen
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,8 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -24,26 +24,36 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.reclaim.domain.apps.AddedAppsRepository
+import com.example.reclaim.domain.apps.AppCatalog
 import com.example.reclaim.ui.theme.ReclaimBg
 import com.example.reclaim.ui.theme.ReclaimInk
 import com.example.reclaim.ui.theme.ReclaimInk3
 import com.example.reclaim.ui.theme.ReclaimLine
-import com.example.reclaim.ui.theme.ReclaimRed
 import com.example.reclaim.ui.theme.ReclaimTheme
+import kotlin.time.Duration
 
 private data class AppEntry(
-    val id: String,
-    val name: String,
-    val initials: String,
-    val brand: Color
+    val packageName: String,
+    val displayName: String,
+    val quota: Duration,
 )
 
 @Composable
-fun AppsScreen(onAppClick: (appId: String) -> Unit) {
-    val apps = listOf(
-        AppEntry("instagram", "Instagram", "Ig", ReclaimRed),
-        AppEntry("tiktok", "TikTok", "Tt", ReclaimInk)
-    )
+fun AppsScreen(
+    addedApps: AddedAppsRepository,
+    catalog: AppCatalog,
+    onAppClick: (packageName: String) -> Unit,
+) {
+    val nameByPackage = catalog.installedApps().associate { it.packageName to it.displayName }
+    val entries = addedApps.addedApps().map {
+        AppEntry(
+            packageName = it.packageName,
+            displayName = nameByPackage[it.packageName] ?: it.packageName,
+            quota = it.dailyQuota,
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -57,20 +67,25 @@ fun AppsScreen(onAppClick: (appId: String) -> Unit) {
             fontWeight = FontWeight.SemiBold
         )
         Spacer(Modifier.height(8.dp))
-        Text(
-            text = "(design pending — screen 4) Tap an app to open the lock screen.",
-            color = ReclaimInk3,
-            fontSize = 12.sp
-        )
-        Spacer(Modifier.height(20.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            apps.forEach { app -> AppRow(app, onClick = { onAppClick(app.id) }) }
+        if (entries.isEmpty()) {
+            Text(
+                text = "Tap + to start tracking an app.",
+                color = ReclaimInk3,
+                fontSize = 13.sp,
+            )
+        } else {
+            Spacer(Modifier.height(12.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                entries.forEach { entry ->
+                    AppRow(entry = entry, onClick = { onAppClick(entry.packageName) })
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun AppRow(app: AppEntry, onClick: () -> Unit) {
+private fun AppRow(entry: AppEntry, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -85,18 +100,52 @@ private fun AppRow(app: AppEntry, onClick: () -> Unit) {
             modifier = Modifier
                 .size(40.dp)
                 .clip(RoundedCornerShape(10.dp))
-                .background(app.brand),
+                .background(ReclaimInk),
             contentAlignment = Alignment.Center
         ) {
-            Text(app.initials, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                entry.displayName.take(2),
+                color = Color.White,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
         }
         Spacer(Modifier.size(12.dp))
-        Text(app.name, color = ReclaimInk, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(entry.displayName, color = ReclaimInk, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+            Text(
+                text = formatQuota(entry.quota) + " / day",
+                color = ReclaimInk3,
+                fontSize = 12.sp,
+            )
+        }
+    }
+}
+
+private fun formatQuota(quota: Duration): String {
+    val totalMinutes = quota.inWholeMinutes
+    val h = totalMinutes / 60
+    val m = totalMinutes % 60
+    return when {
+        h > 0 && m > 0 -> "${h}h ${m}m"
+        h > 0 -> "${h}h"
+        else -> "${m}m"
     }
 }
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 private fun AppsScreenPreview() {
-    ReclaimTheme { AppsScreen(onAppClick = {}) }
+    ReclaimTheme {
+        AppsScreen(
+            addedApps = object : AddedAppsRepository {
+                override fun addedApps() = emptyList<com.example.reclaim.domain.apps.AddedApp>()
+                override fun add(addedApp: com.example.reclaim.domain.apps.AddedApp) {}
+            },
+            catalog = object : AppCatalog {
+                override fun installedApps() = emptyList<com.example.reclaim.domain.apps.App>()
+            },
+            onAppClick = {},
+        )
+    }
 }
