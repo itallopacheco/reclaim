@@ -21,6 +21,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.reclaim.domain.apps.AddedAppsRepository
+import com.example.reclaim.domain.apps.SearchAppsUseCase
+import com.example.reclaim.domain.apps.SuggestAppsUseCase
 import com.example.reclaim.ui.theme.ReclaimBg
 import com.example.reclaim.ui.theme.ReclaimInk
 import com.example.reclaim.ui.theme.ReclaimInk3
@@ -29,8 +32,11 @@ import com.example.reclaim.ui.theme.ReclaimTeal
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddAppSheet(
+    suggestApps: SuggestAppsUseCase,
+    searchApps: SearchAppsUseCase,
+    addedApps: AddedAppsRepository,
     onDismiss: () -> Unit,
-    onSave: () -> Unit
+    onSaved: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
@@ -39,50 +45,62 @@ fun AddAppSheet(
         containerColor = ReclaimBg,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 24.dp)
+        AddAppSheetContent(
+            suggestApps = suggestApps,
+            searchApps = searchApps,
+            addedApps = addedApps,
+            onDismiss = onDismiss,
+            onSaved = onSaved,
+        )
+    }
+}
+
+@Composable
+fun AddAppSheetContent(
+    suggestApps: SuggestAppsUseCase,
+    searchApps: SearchAppsUseCase,
+    addedApps: AddedAppsRepository,
+    onDismiss: () -> Unit,
+    onSaved: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .padding(bottom = 24.dp)
+    ) {
+        Text(
+            text = "Add app",
+            color = ReclaimInk,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+        Spacer(Modifier.height(24.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "Add app",
-                color = ReclaimInk,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = "(design pending — screen 5)",
-                color = ReclaimInk3,
-                fontSize = 12.sp
-            )
-            Spacer(Modifier.height(24.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp)
             ) {
-                TextButton(
-                    onClick = onDismiss,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp)
-                ) {
-                    Text("Cancel", color = ReclaimInk3, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                }
-                Button(
-                    onClick = onSave,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = ReclaimTeal,
-                        contentColor = Color.White
-                    )
-                ) {
-                    Text("Save", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                }
+                Text("Cancel", color = ReclaimInk3, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            }
+            Button(
+                onClick = onSaved,
+                enabled = false,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = ReclaimTeal,
+                    contentColor = Color.White
+                )
+            ) {
+                Text("Save", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
