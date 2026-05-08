@@ -76,7 +76,7 @@ class ReclaimApplication : Application() {
         )
 
     val shouldBlockApp: ShouldBlockAppUseCase
-        get() = ShouldBlockAppUseCase(addedApps = addedApps, usageStats = usageStats)
+        get() = ShouldBlockAppUseCase(addedApps = addedApps, usageStats = usageStats, rewards = rewards)
 
     val foregroundAppMonitor: ForegroundAppMonitor by lazy {
         UsageEventsForegroundAppMonitor(
