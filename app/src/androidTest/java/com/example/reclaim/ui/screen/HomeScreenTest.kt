@@ -225,6 +225,30 @@ class HomeScreenTest {
     }
 
     @Test
+    fun earnedPillHiddenWhenNoMinutesEarnedToday() {
+        composeRule.setContent {
+            ReclaimTheme {
+                HomeScreenContent(
+                    todayScreenTime = 1.hours,
+                    dailyLimit = 2.hours,
+                    hasUsageAccess = true,
+                    hasAddedApps = true,
+                    onOpenUsageAccess = {},
+                    habitsSummary = HabitsTodaySummary(
+                        earned = Duration.ZERO,
+                        completed = 0,
+                        total = 2,
+                        available = 30.minutes,
+                        nextPending = Habit(1L, "Read", HabitIcon.BOOK_OPEN, 30.minutes),
+                    ),
+                )
+            }
+        }
+
+        composeRule.onAllNodesWithText("earned today", substring = true).assertCountEquals(0)
+    }
+
+    @Test
     fun earnedPillShowsFormattedMinutesWhenEarnedAboveZero() {
         composeRule.setContent {
             ReclaimTheme {
