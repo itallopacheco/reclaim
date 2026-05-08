@@ -39,6 +39,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.reclaim.domain.apps.AddedAppsRepository
+import com.example.reclaim.domain.apps.HomeAppRow
 import com.example.reclaim.domain.apps.TodayScreenTimeUseCase
 import com.example.reclaim.ui.theme.ReclaimBg
 import com.example.reclaim.ui.theme.ReclaimInk
@@ -94,6 +95,8 @@ internal fun HomeScreenContent(
     hasAddedApps: Boolean,
     onOpenUsageAccess: () -> Unit,
     today: LocalDate = LocalDate.now(),
+    topApps: List<HomeAppRow> = emptyList(),
+    onSeeAllApps: () -> Unit = {},
 ) {
     val exceeded = hasUsageAccess && todayScreenTime > dailyLimit
     val progress = when {
@@ -118,7 +121,20 @@ internal fun HomeScreenContent(
             emptyHint = if (!hasAddedApps) "Add apps to set your daily limit" else null,
             grantUsageAccess = if (!hasUsageAccess) onOpenUsageAccess else null,
         )
+        if (topApps.isNotEmpty()) {
+            TopAppsSection(rows = topApps, onSeeAllApps = onSeeAllApps)
+        }
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun TopAppsSection(rows: List<HomeAppRow>, onSeeAllApps: () -> Unit) {
+    Column {
+        rows.forEach { row ->
+            Text(text = row.app.displayName)
+            Text(text = "${formatScreenTime(row.today)} / ${formatScreenTime(row.quota)}")
+        }
     }
 }
 

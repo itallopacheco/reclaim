@@ -8,6 +8,9 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import com.example.reclaim.domain.apps.App
+import com.example.reclaim.domain.apps.HomeAppRow
+import com.example.reclaim.domain.apps.HomeAppStatus
 import com.example.reclaim.ui.theme.ReclaimTheme
 import java.time.LocalDate
 import kotlin.time.Duration
@@ -147,5 +150,31 @@ class HomeScreenTest {
         }
 
         composeRule.onNodeWithText("0h 0m").assertIsDisplayed()
+    }
+
+    @Test
+    fun topAppsSectionRendersRowsRanked() {
+        val instagram = App("com.instagram.android", "Instagram", isLauncherApp = true)
+        val tiktok = App("com.zhiliaoapp.musically", "TikTok", isLauncherApp = true)
+        composeRule.setContent {
+            ReclaimTheme {
+                HomeScreenContent(
+                    todayScreenTime = 2.hours + 30.minutes,
+                    dailyLimit = 3.hours,
+                    hasUsageAccess = true,
+                    hasAddedApps = true,
+                    onOpenUsageAccess = {},
+                    topApps = listOf(
+                        HomeAppRow(instagram, 2.hours, 1.hours, HomeAppStatus.OVER),
+                        HomeAppRow(tiktok, 30.minutes, 2.hours, HomeAppStatus.OK),
+                    ),
+                    onSeeAllApps = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Instagram").assertIsDisplayed()
+        composeRule.onNodeWithText("TikTok").assertIsDisplayed()
+        composeRule.onNodeWithText("2h / 1h").assertIsDisplayed()
     }
 }
