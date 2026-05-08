@@ -90,7 +90,9 @@ fun ReclaimNavHost(
                     habitsRepository = app.habits,
                     habitsSummary = app.habitsTodaySummary,
                     hasUsageAccess = { app.usageStats.hasUsageAccess() },
+                    hasOverlayPermission = { Permissions.canDrawOverlays(context) },
                     onOpenUsageAccess = openUsageAccess,
+                    onOpenOverlaySettings = openOverlaySettings,
                     onSeeAllApps = { navController.switchTab(TabDestination.Apps) },
                     refreshTick = refreshTick,
                 )

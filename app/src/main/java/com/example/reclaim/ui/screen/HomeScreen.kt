@@ -82,7 +82,9 @@ fun HomeScreen(
     habitsRepository: HabitsRepository,
     habitsSummary: HabitsTodaySummaryUseCase,
     hasUsageAccess: () -> Boolean,
+    hasOverlayPermission: () -> Boolean,
     onOpenUsageAccess: () -> Unit,
+    onOpenOverlaySettings: () -> Unit,
     onSeeAllApps: () -> Unit,
     refreshTick: Int = 0,
 ) {
@@ -95,6 +97,7 @@ fun HomeScreen(
     val accessGranted = hasUsageAccess()
     val rankedRows = if (accessGranted && added.isNotEmpty()) rankAppsForHome.invoke() else emptyList()
     val summary = habitsSummary.invoke()
+    val blockingInactive = added.isNotEmpty() && !hasOverlayPermission()
 
     HomeScreenContent(
         todayScreenTime = today,
@@ -111,6 +114,8 @@ fun HomeScreen(
                 localTick++
             }
         },
+        blockingInactive = blockingInactive,
+        onOpenOverlaySettings = onOpenOverlaySettings,
     )
 }
 
@@ -180,6 +185,8 @@ internal fun HomeScreenContent(
     onSeeAllApps: () -> Unit = {},
     habitsSummary: HabitsTodaySummary = EMPTY_HABITS_SUMMARY,
     onMarkHabitComplete: (Long) -> Unit = {},
+    blockingInactive: Boolean = false,
+    onOpenOverlaySettings: () -> Unit = {},
 ) {
     val exceeded = hasUsageAccess && todayScreenTime > dailyLimit
     val progress = when {
@@ -194,6 +201,9 @@ internal fun HomeScreenContent(
             .verticalScroll(rememberScrollState()),
     ) {
         Header(today = today)
+        if (blockingInactive) {
+            BlockingInactiveBanner(onGrant = onOpenOverlaySettings)
+        }
         HeroRing(
             progress = progress,
             centerNumber = if (hasUsageAccess) formatScreenTime(todayScreenTime) else "—",
@@ -434,6 +444,35 @@ private fun TopAppRow(row: HomeAppRow) {
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun BlockingInactiveBanner(onGrant: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 6.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(ReclaimAmberBg)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "Blocking is inactive. Grant the overlay permission to enable it.",
+            color = ReclaimAmber,
+            fontSize = 12.5.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.weight(1f),
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text = "Grant",
+            color = ReclaimAmber,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.clickable(onClick = onGrant),
+        )
     }
 }
 
