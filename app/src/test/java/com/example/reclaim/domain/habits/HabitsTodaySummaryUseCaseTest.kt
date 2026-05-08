@@ -36,9 +36,30 @@ class HabitsTodaySummaryUseCaseTest {
         val summary = HabitsTodaySummaryUseCase(repo).invoke()
 
         assertEquals(
-            HabitsTodaySummary(earned = 45.minutes, completed = 2, total = 4, available = 55.minutes),
+            HabitsTodaySummary(
+                earned = 45.minutes,
+                completed = 2,
+                total = 4,
+                available = 55.minutes,
+                nextPending = b,
+            ),
             summary,
         )
+    }
+
+    @Test
+    fun `nextPending is the first pending habit in creation order`() {
+        val a = Habit(1L, "A", HabitIcon.BOOK_OPEN, 30.minutes)
+        val b = Habit(2L, "B", HabitIcon.DUMBBELL, 45.minutes)
+        val c = Habit(3L, "C", HabitIcon.SUN, 15.minutes)
+        val repo = FakeHabitsRepository(
+            initial = listOf(a, b, c),
+            initialCompletions = mapOf(1L to 0),
+        )
+
+        val summary = HabitsTodaySummaryUseCase(repo).invoke()
+
+        assertEquals(b, summary.nextPending)
     }
 
     @Test
@@ -48,7 +69,13 @@ class HabitsTodaySummaryUseCaseTest {
         val summary = HabitsTodaySummaryUseCase(repo).invoke()
 
         assertEquals(
-            HabitsTodaySummary(earned = Duration.ZERO, completed = 0, total = 0, available = Duration.ZERO),
+            HabitsTodaySummary(
+                earned = Duration.ZERO,
+                completed = 0,
+                total = 0,
+                available = Duration.ZERO,
+                nextPending = null,
+            ),
             summary,
         )
     }

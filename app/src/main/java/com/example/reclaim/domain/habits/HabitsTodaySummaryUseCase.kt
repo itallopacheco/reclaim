@@ -12,6 +12,7 @@ class HabitsTodaySummaryUseCase(private val habits: HabitsRepository) {
             completed = done.size,
             total = all.size,
             available = pending.fold(Duration.ZERO) { acc, h -> acc + h.reward },
+            nextPending = pending.firstOrNull(),
         )
     }
 }

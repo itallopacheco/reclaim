@@ -7,4 +7,5 @@ data class HabitsTodaySummary(
     val completed: Int,
     val total: Int,
     val available: Duration,
+    val nextPending: Habit?,
 )
