@@ -63,16 +63,24 @@ app/src/main/java/com/example/reclaim/
 │   │   ├── BlockingDecision.kt              # interface: isBlocked(packageName)
 │   │   ├── ForegroundAppMonitor.kt          # interface: currentForegroundPackage()
 │   │   └── ShouldBlockAppUseCase.kt         # implements BlockingDecision: today >= dailyQuota
-│   └── habits/
-│       ├── Habit.kt, HabitIcon.kt, HabitsTodaySummary.kt
-│       ├── HabitsRepository.kt              # CRUD + completionsToday()/markCompleteToday/unmarkToday
-│       └── HabitsTodaySummaryUseCase.kt
+│   ├── habits/
+│   │   ├── Habit.kt, HabitIcon.kt, HabitsTodaySummary.kt
+│   │   ├── HabitsRepository.kt              # CRUD + completionsToday()/markCompleteToday/unmarkToday
+│   │   └── HabitsTodaySummaryUseCase.kt
+│   └── rewards/                # daily reward pool (grows with habits, spent in over-quota apps)
+│       ├── RewardsRepository.kt             # currentBalance / addReward / subtractReward / spend
+│       ├── CurrentRewardBalanceUseCase.kt
+│       ├── ApplyRewardSpendUseCase.kt       # clamps at zero
+│       ├── ApplyHabitRewardUseCase.kt
+│       └── ApplyHabitUnrewardUseCase.kt     # may go negative
 ├── data/                        # adapters that implement the domain interfaces
 │   ├── PackageManagerAppCatalog.kt          # Intent.ACTION_MAIN + CATEGORY_LAUNCHER, excludes Reclaim
 │   ├── UsageStatsManagerStats.kt            # queryUsageStats(INTERVAL_DAILY) for 7-day avg + today
 │   ├── UsageEventsForegroundAppMonitor.kt   # queryEvents w/ 10s lookback, last ACTIVITY_RESUMED
 │   ├── DataStoreAddedAppsRepository.kt      # AddedApp persistence via DataStore Preferences
 │   ├── DataStoreHabitsRepository.kt         # Habits + per-day completion counts via DataStore
+│   ├── DataStoreRewardsRepository.kt        # reward balance (Long seconds) + day rollover marker
+│   ├── RewardingHabitsRepository.kt         # decorator: applies reward side-effects on mark/unmark
 │   ├── BlockingService.kt                   # foreground service, polls foreground app every 1s
 │   ├── BlockingServiceController.kt         # start/stop hooks for the service
 │   ├── BootCompletedReceiver.kt             # restarts BlockingService after reboot
@@ -109,6 +117,15 @@ Three loose layers. No DI framework yet, no ViewModels yet.
 `BlockingService` is a foreground service started from `MainActivity`. Every second it asks `ForegroundAppMonitor.currentForegroundPackage()`, runs `ShouldBlockAppUseCase.invoke(pkg)`, and — if blocked and `Permissions.canDrawOverlays()` — launches `BlockingActivity` on top of the offending app. `BootCompletedReceiver` restarts the service after a reboot. The service stops itself when the user has no added apps left.
 
 `RankAppsForHomeUseCase` injects `BlockingDecision` so each `HomeAppRow` carries `isBlockingNow`, surfaced as `BlockingNowBadge` on Home and Apps cards.
+
+### Rewards
+
+A single daily reward pool ("saldo bônus") grows when habits are completed and is consumed in real time while the user stays in apps that already exhausted their quota. The pool is a `Duration` stored as `Long` seconds, with a `rewards_day` marker that resets the balance on a local-date change. Negative balances are allowed when the user undoes a habit they already spent.
+
+- `ShouldBlockAppUseCase` is the only place the rule lives: it returns `true` only when `usage >= dailyQuota AND balance <= 0`. Both `BlockingService` and `RankAppsForHomeUseCase` consume the unchanged `BlockingDecision` interface.
+- `RewardingHabitsRepository` wraps `DataStoreHabitsRepository` so that every `markCompleteToday` adds `Habit.reward` to the pool and every `unmarkToday` subtracts it. Each habit completion adds another reward — multiple completions per day stack.
+- `BlockingService.pollOnce` decrements the balance (using `SystemClock.elapsedRealtime()` deltas) before the block check whenever the foreground app is added and over its quota. The service notification's content text reflects state per tick: `Saldo bônus: X min restantes` while spending, `Reclaim está protegendo seus limites` otherwise.
+- `HomeScreen` renders two pills above the hero ring (`EarnedPill` + `AvailablePill`), each independently hidden when its value is `<= 0`. The outer `HomeScreen` polls `CurrentRewardBalanceUseCase` every 1s via `LaunchedEffect` so the available value follows the spend in near-real time.
 
 `ReclaimApplication` is the DI root — it owns the lazy adapter instances and exposes use cases as properties. Screens reach it via `context.reclaimApplication()` and receive the dependencies they need through `ReclaimNavHost`. No DI framework, no ViewModels.
 
@@ -148,15 +165,21 @@ app/src/test/java/com/example/reclaim/
 │   ├── blocking/
 │   │   ├── ShouldBlockAppUseCaseTest.kt
 │   │   └── fakes/  (FakeBlockingDecision)
-│   └── habits/
-│       ├── HabitsTodaySummaryUseCaseTest.kt
-│       └── fakes/  (FakeHabitsRepository)
+│   ├── habits/
+│   │   ├── HabitsTodaySummaryUseCaseTest.kt
+│   │   └── fakes/  (FakeHabitsRepository)
+│   └── rewards/
+│       ├── CurrentRewardBalanceUseCaseTest.kt, ApplyRewardSpendUseCaseTest.kt
+│       ├── ApplyHabitRewardUseCaseTest.kt, ApplyHabitUnrewardUseCaseTest.kt
+│       └── fakes/  (FakeRewardsRepository)
 └── data/                                   # Robolectric-backed adapter tests
     ├── PackageManagerAppCatalogTest.kt
     ├── UsageStatsManagerStatsTest.kt
     ├── UsageEventsForegroundAppMonitorTest.kt
     ├── DataStoreAddedAppsRepositoryTest.kt
-    └── DataStoreHabitsRepositoryTest.kt
+    ├── DataStoreHabitsRepositoryTest.kt
+    ├── DataStoreRewardsRepositoryTest.kt
+    └── RewardingHabitsRepositoryTest.kt
 
 app/src/androidTest/java/com/example/reclaim/ui/screen/
 ├── AddAppSheetTest.kt, EditAppSheetTest.kt

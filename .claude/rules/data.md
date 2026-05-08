@@ -19,11 +19,13 @@ The `data/` package holds adapters that implement interfaces declared anywhere u
 **Write-bearing adapters**
 
 - `DataStoreAddedAppsRepository(dataStore)` — persists `AddedApp` entries. `add` is idempotent by `packageName`, `delete` is a no-op for absent packages.
-- `DataStoreHabitsRepository(dataStore)` — persists habits and per-day completion counts. Same idempotency contract; `markCompleteToday` increments, `unmarkToday` clears.
+- `DataStoreHabitsRepository(dataStore)` — persists habits and per-day completion counts. Same idempotency contract; `markCompleteToday` increments, `unmarkToday` clears. Day-rollover is handled lazily via a `completion_day` marker — the first read after a local-date change clears yesterday's completions.
+- `DataStoreRewardsRepository(dataStore)` — persists the daily reward pool as `rewards_balance_seconds: Long` plus a `rewards_day` marker. `addReward` / `subtractReward` mutate freely (negative balances allowed); `spend` clamps at zero. Day rollover mirrors the habits pattern: on a new local date the balance reads zero and the marker is rewritten.
+- `RewardingHabitsRepository(inner: HabitsRepository, rewards: RewardsRepository)` — Kotlin-`by`-delegation decorator that overrides only `markCompleteToday` (adds `Habit.reward` to the pool) and `unmarkToday` (subtracts when a completion existed). `ReclaimApplication.habits` exposes the *wrapped* instance, so any caller of `markCompleteToday`/`unmarkToday` automatically credits or debits the pool. Unknown habit ids are a no-op on both sides.
 
 **Blocking runtime**
 
-- `BlockingService` — foreground service (`FOREGROUND_SERVICE_TYPE_SPECIAL_USE`). Polls `foregroundAppMonitor.currentForegroundPackage()` every `POLL_INTERVAL = 1.seconds` via `Handler(Looper.getMainLooper()).postDelayed(...)` and dispatches `BlockingActivity` once per blocked package (deduped by `lastBlockedDispatched`). Skips dispatch if `Permissions.canDrawOverlays()` is false. Calls `stopSelf()` when no apps are added. `companion object` exposes `start(ctx)` / `stop(ctx)` — those are the only entry points; never `Intent`-construct the service from elsewhere.
+- `BlockingService` — foreground service (`FOREGROUND_SERVICE_TYPE_SPECIAL_USE`). Polls `foregroundAppMonitor.currentForegroundPackage()` every `POLL_INTERVAL = 1.seconds` via `Handler(Looper.getMainLooper()).postDelayed(...)` and dispatches `BlockingActivity` once per blocked package (deduped by `lastBlockedDispatched`). Each tick first calls `applyRewardSpend.invoke(elapsed)` (using `SystemClock.elapsedRealtime()` deltas) when the foreground app is added and over its quota — *before* asking `shouldBlockApp.invoke(...)` — so a positive balance can mask the block until it ticks down to zero. Notification text is updated per tick to `Saldo bônus: X min restantes` while spending and reverts to `Reclaim está protegendo seus limites` otherwise; `notify` is only re-issued when the text actually changes. Skips overlay dispatch if `Permissions.canDrawOverlays()` is false. Calls `stopSelf()` when no apps are added. `companion object` exposes `start(ctx)` / `stop(ctx)` — those are the only entry points; never `Intent`-construct the service from elsewhere.
 - `BlockingServiceController` — the orchestrator that decides when to call `BlockingService.start/stop`.
 - `BootCompletedReceiver` — re-arms `BlockingService` after `BOOT_COMPLETED`.
 - `Permissions` — pure helpers: `hasUsageAccess(context)`, `canDrawOverlays(context)`. No DI; called directly where needed.
@@ -35,6 +37,10 @@ All adapters are constructed once per process in `ReclaimApplication` as `by laz
 Match the domain interface's contract exactly. No additional public methods unless the call site needs framework-specific affordances (`hasUsageAccess()` on `UsageStatsManagerStats`, `invalidate()` on `PackageManagerAppCatalog`).
 
 `addedApps()` returns a defensive copy. `add()` is **idempotent by `packageName`** — calling it twice with the same package replaces the entry, never accumulates. `delete()` is also idempotent: deleting an absent package is a no-op.
+
+## Decorator adapters
+
+`RewardingHabitsRepository` is a precedent for layering cross-feature side-effects in `data/`: a class that implements one domain interface (`HabitsRepository`), takes another as a collaborator (`RewardsRepository`), delegates the bulk via `: HabitsRepository by inner`, and overrides only the methods that need the side-effect. The wiring in `ReclaimApplication` swaps the lazy property to expose the decorated instance — callers see the original interface. Use this pattern instead of either (a) calling the secondary use case from every UI site that mutates the primary repository, or (b) folding cross-feature logic into the primary adapter.
 
 ## Filters that depend on real-world knowledge
 

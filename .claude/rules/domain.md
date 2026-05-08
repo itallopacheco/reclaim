@@ -49,6 +49,8 @@ data class HabitsTodaySummary(val pending: List<Habit>, val completed: List<Habi
                               val totalReward: Duration)
 ```
 
+The rewards feature has no entity — the daily balance is exposed as a plain `kotlin.time.Duration` from `RewardsRepository.currentBalance()`.
+
 ## Interfaces
 
 - One method per interface where possible, named for what it returns (`installedApps()`, `avgDailyUsageLast7Days()`, `addedApps()`). No `get` prefix — Kotlin convention.
@@ -84,9 +86,17 @@ interface HabitsRepository {
     fun markCompleteToday(id: Long, atMinuteOfDay: Int)
     fun unmarkToday(id: Long)
 }
+
+// rewards
+interface RewardsRepository {
+    fun currentBalance(): Duration
+    fun addReward(amount: Duration)
+    fun subtractReward(amount: Duration)  // allows negative
+    fun spend(amount: Duration)            // clamps at zero
+}
 ```
 
-Write-bearing interfaces (`AddedAppsRepository`, `HabitsRepository`) are idempotent by primary key — `add` replaces a same-key entry, `delete`/`unmarkToday` on an absent key is a no-op. The contract belongs to implementations in `data/`, not the domain itself.
+Write-bearing interfaces (`AddedAppsRepository`, `HabitsRepository`, `RewardsRepository`) are idempotent by primary key — `add` replaces a same-key entry, `delete`/`unmarkToday` on an absent key is a no-op. `RewardsRepository` mutations always succeed — the only contract is that `spend` never drives the balance below zero, while `subtractReward` may. The behavioral contract belongs to implementations in `data/`, not the domain itself.
 
 Current use cases:
 
@@ -94,8 +104,11 @@ Current use cases:
 - `SearchAppsUseCase(catalog, addedApps)` — substring search over installed apps, excluding already-added.
 - `TodayScreenTimeUseCase(addedApps, usageStats)` — sums `usageToday()` across the user's added packages. Drives the Home hero ring.
 - `RankAppsForHomeUseCase(addedApps, usageStats, catalog, blockingDecision)` — returns ranked `HomeAppRow`s for Home/Apps; computes `HomeAppStatus` (OK / WARN at ≥80% / OVER) and a separate `isBlockingNow` flag.
-- `ShouldBlockAppUseCase(addedApps, usageStats)` — *implements* `BlockingDecision`. A use case being its own interface implementation is intentional: the public `invoke()` is for screens that want imperative phrasing, and `isBlocked()` is what `RankAppsForHomeUseCase` and `BlockingService` consume through the abstraction.
+- `ShouldBlockAppUseCase(addedApps, usageStats, rewards)` — *implements* `BlockingDecision`. Returns `true` when `usage >= dailyQuota AND rewards.currentBalance() <= 0`. A use case being its own interface implementation is intentional: the public `invoke()` is for screens that want imperative phrasing, and `isBlocked()` is what `RankAppsForHomeUseCase` and `BlockingService` consume through the abstraction.
 - `HabitsTodaySummaryUseCase(habits)` — partitions habits by today's completion count and folds rewards into `HabitsTodaySummary`.
+- `CurrentRewardBalanceUseCase(rewards)` — read-through wrapper. Drives the Home `AvailablePill` and the foreground service's notification text.
+- `ApplyRewardSpendUseCase(rewards)` — used by `BlockingService.pollOnce` to debit the pool by the elapsed wall-clock between ticks; relies on `spend`'s clamp-at-zero contract.
+- `ApplyHabitRewardUseCase(rewards)` / `ApplyHabitUnrewardUseCase(rewards)` — invoked by the `RewardingHabitsRepository` decorator on `markCompleteToday` / `unmarkToday`.
 
 ## What the domain does NOT decide
 
@@ -122,9 +135,13 @@ app/src/test/java/com/example/reclaim/domain/
 ├── blocking/
 │   ├── ShouldBlockAppUseCaseTest.kt
 │   └── fakes/  (FakeBlockingDecision)
-└── habits/
-    ├── HabitsTodaySummaryUseCaseTest.kt
-    └── fakes/  (FakeHabitsRepository)
+├── habits/
+│   ├── HabitsTodaySummaryUseCaseTest.kt
+│   └── fakes/  (FakeHabitsRepository)
+└── rewards/
+    ├── CurrentRewardBalanceUseCaseTest.kt, ApplyRewardSpendUseCaseTest.kt
+    ├── ApplyHabitRewardUseCaseTest.kt, ApplyHabitUnrewardUseCaseTest.kt
+    └── fakes/  (FakeRewardsRepository — mutable since the contract mutates)
 ```
 
 - One test class per use case, named `<UseCase>Test`.
