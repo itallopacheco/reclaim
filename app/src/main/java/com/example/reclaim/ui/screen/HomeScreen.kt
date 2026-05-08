@@ -28,6 +28,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,7 +54,9 @@ import com.example.reclaim.domain.apps.HomeAppStatus
 import com.example.reclaim.domain.apps.RankAppsForHomeUseCase
 import com.example.reclaim.domain.apps.TodayScreenTimeUseCase
 import com.example.reclaim.domain.habits.Habit
+import com.example.reclaim.domain.habits.HabitsRepository
 import com.example.reclaim.domain.habits.HabitsTodaySummary
+import com.example.reclaim.domain.habits.HabitsTodaySummaryUseCase
 import com.example.reclaim.ui.theme.ReclaimAmber
 import com.example.reclaim.ui.theme.ReclaimAmberBg
 import com.example.reclaim.ui.theme.ReclaimBg
@@ -73,17 +79,22 @@ fun HomeScreen(
     addedApps: AddedAppsRepository,
     todayScreenTime: TodayScreenTimeUseCase,
     rankAppsForHome: RankAppsForHomeUseCase,
+    habitsRepository: HabitsRepository,
+    habitsSummary: HabitsTodaySummaryUseCase,
     hasUsageAccess: () -> Boolean,
     onOpenUsageAccess: () -> Unit,
     onSeeAllApps: () -> Unit,
     refreshTick: Int = 0,
 ) {
+    var localTick by remember { mutableIntStateOf(0) }
     @Suppress("UNUSED_EXPRESSION") refreshTick
+    @Suppress("UNUSED_EXPRESSION") localTick
     val added = addedApps.addedApps()
     val limit = added.fold(Duration.ZERO) { acc, app -> acc + app.dailyQuota }
     val today = todayScreenTime.invoke()
     val accessGranted = hasUsageAccess()
     val rankedRows = if (accessGranted && added.isNotEmpty()) rankAppsForHome.invoke() else emptyList()
+    val summary = habitsSummary.invoke()
 
     HomeScreenContent(
         todayScreenTime = today,
@@ -93,7 +104,19 @@ fun HomeScreen(
         onOpenUsageAccess = onOpenUsageAccess,
         topApps = rankedRows,
         onSeeAllApps = onSeeAllApps,
+        habitsSummary = summary,
+        onMarkHabitComplete = { id ->
+            if (id !in habitsRepository.completionsToday().keys) {
+                habitsRepository.markCompleteToday(id, currentMinuteOfDay())
+                localTick++
+            }
+        },
     )
+}
+
+private fun currentMinuteOfDay(): Int {
+    val now = java.time.LocalTime.now()
+    return now.hour * 60 + now.minute
 }
 
 private val EMPTY_HABITS_SUMMARY = HabitsTodaySummary(
