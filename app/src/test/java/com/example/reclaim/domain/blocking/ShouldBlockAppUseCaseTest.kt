@@ -86,4 +86,15 @@ class ShouldBlockAppUseCaseTest {
 
         assertTrue(useCase.invoke("x"))
     }
+
+    @Test
+    fun `returns true when quota is zero even with no usage entry`() {
+        val repo = FakeAddedAppsRepository().apply {
+            add(AddedApp(packageName = "x", dailyQuota = Duration.ZERO))
+        }
+        val stats = FakeUsageStats(avgs = emptyMap(), today = emptyMap())
+        val useCase = ShouldBlockAppUseCase(repo, stats)
+
+        assertTrue(useCase.invoke("x"))
+    }
 }
