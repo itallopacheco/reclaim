@@ -9,6 +9,8 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.reclaim.data.DataStoreAddedAppsRepository
 import com.example.reclaim.data.DataStoreHabitsRepository
+import com.example.reclaim.data.DataStoreRewardsRepository
+import com.example.reclaim.data.RewardingHabitsRepository
 import com.example.reclaim.data.PackageManagerAppCatalog
 import com.example.reclaim.data.UsageEventsForegroundAppMonitor
 import com.example.reclaim.data.UsageStatsManagerStats
@@ -21,6 +23,11 @@ import com.example.reclaim.domain.blocking.ForegroundAppMonitor
 import com.example.reclaim.domain.blocking.ShouldBlockAppUseCase
 import com.example.reclaim.domain.habits.HabitsRepository
 import com.example.reclaim.domain.habits.HabitsTodaySummaryUseCase
+import com.example.reclaim.domain.rewards.ApplyHabitRewardUseCase
+import com.example.reclaim.domain.rewards.ApplyHabitUnrewardUseCase
+import com.example.reclaim.domain.rewards.ApplyRewardSpendUseCase
+import com.example.reclaim.domain.rewards.CurrentRewardBalanceUseCase
+import com.example.reclaim.domain.rewards.RewardsRepository
 
 private val Context.addedAppsDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "added_apps",
@@ -28,6 +35,10 @@ private val Context.addedAppsDataStore: DataStore<Preferences> by preferencesDat
 
 private val Context.habitsDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "habits",
+)
+
+private val Context.rewardsDataStore: DataStore<Preferences> by preferencesDataStore(
+    name = "rewards",
 )
 
 class ReclaimApplication : Application() {
@@ -66,7 +77,7 @@ class ReclaimApplication : Application() {
         )
 
     val shouldBlockApp: ShouldBlockAppUseCase
-        get() = ShouldBlockAppUseCase(addedApps = addedApps, usageStats = usageStats)
+        get() = ShouldBlockAppUseCase(addedApps = addedApps, usageStats = usageStats, rewards = rewards)
 
     val foregroundAppMonitor: ForegroundAppMonitor by lazy {
         UsageEventsForegroundAppMonitor(
@@ -75,11 +86,30 @@ class ReclaimApplication : Application() {
     }
 
     val habits: HabitsRepository by lazy {
-        DataStoreHabitsRepository(habitsDataStore)
+        RewardingHabitsRepository(
+            inner = DataStoreHabitsRepository(habitsDataStore),
+            rewards = rewards,
+        )
     }
 
     val habitsTodaySummary: HabitsTodaySummaryUseCase
         get() = HabitsTodaySummaryUseCase(habits = habits)
+
+    val rewards: RewardsRepository by lazy {
+        DataStoreRewardsRepository(rewardsDataStore)
+    }
+
+    val currentRewardBalance: CurrentRewardBalanceUseCase
+        get() = CurrentRewardBalanceUseCase(rewards = rewards)
+
+    val applyRewardSpend: ApplyRewardSpendUseCase
+        get() = ApplyRewardSpendUseCase(rewards = rewards)
+
+    val applyHabitReward: ApplyHabitRewardUseCase
+        get() = ApplyHabitRewardUseCase(rewards = rewards)
+
+    val applyHabitUnreward: ApplyHabitUnrewardUseCase
+        get() = ApplyHabitUnrewardUseCase(rewards = rewards)
 }
 
 fun Context.reclaimApplication(): ReclaimApplication =

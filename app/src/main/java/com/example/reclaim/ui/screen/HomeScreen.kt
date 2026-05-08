@@ -22,14 +22,17 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -57,6 +60,7 @@ import com.example.reclaim.domain.habits.Habit
 import com.example.reclaim.domain.habits.HabitsRepository
 import com.example.reclaim.domain.habits.HabitsTodaySummary
 import com.example.reclaim.domain.habits.HabitsTodaySummaryUseCase
+import com.example.reclaim.domain.rewards.CurrentRewardBalanceUseCase
 import com.example.reclaim.ui.theme.ReclaimAmber
 import com.example.reclaim.ui.theme.ReclaimAmberBg
 import com.example.reclaim.ui.theme.ReclaimBg
@@ -68,6 +72,7 @@ import com.example.reclaim.ui.theme.ReclaimLine
 import com.example.reclaim.ui.theme.ReclaimRed
 import com.example.reclaim.ui.theme.ReclaimTeal
 import com.example.reclaim.ui.theme.ReclaimTeal2
+import com.example.reclaim.ui.theme.ReclaimTeal3
 import com.example.reclaim.ui.theme.ReclaimTheme
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -81,6 +86,7 @@ fun HomeScreen(
     rankAppsForHome: RankAppsForHomeUseCase,
     habitsRepository: HabitsRepository,
     habitsSummary: HabitsTodaySummaryUseCase,
+    currentRewardBalance: CurrentRewardBalanceUseCase,
     hasUsageAccess: () -> Boolean,
     hasOverlayPermission: () -> Boolean,
     onOpenUsageAccess: () -> Unit,
@@ -98,6 +104,13 @@ fun HomeScreen(
     val rankedRows = if (accessGranted && added.isNotEmpty()) rankAppsForHome.invoke() else emptyList()
     val summary = habitsSummary.invoke()
     val blockingInactive = added.isNotEmpty() && !hasOverlayPermission()
+    var rewardBalance by remember { mutableStateOf(currentRewardBalance.invoke()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(REWARD_BALANCE_REFRESH_INTERVAL_MS)
+            rewardBalance = currentRewardBalance.invoke()
+        }
+    }
 
     HomeScreenContent(
         todayScreenTime = today,
@@ -112,12 +125,16 @@ fun HomeScreen(
             if (id !in habitsRepository.completionsToday().keys) {
                 habitsRepository.markCompleteToday(id, currentMinuteOfDay())
                 localTick++
+                rewardBalance = currentRewardBalance.invoke()
             }
         },
         blockingInactive = blockingInactive,
         onOpenOverlaySettings = onOpenOverlaySettings,
+        rewardBalance = rewardBalance,
     )
 }
+
+private const val REWARD_BALANCE_REFRESH_INTERVAL_MS = 1_000L
 
 private fun currentMinuteOfDay(): Int {
     val now = java.time.LocalTime.now()
@@ -133,33 +150,69 @@ private val EMPTY_HABITS_SUMMARY = HabitsTodaySummary(
 )
 
 @Composable
-private fun EarnedPill(earned: Duration) {
+private fun RewardPills(earned: Duration, available: Duration) {
+    val showEarned = earned > Duration.ZERO
+    val showAvailable = available > Duration.ZERO
+    if (!showEarned && !showAvailable) return
     Spacer(Modifier.height(16.dp))
-    Box(
+    Row(
         modifier = Modifier.fillMaxWidth(),
-        contentAlignment = Alignment.Center,
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(999.dp))
-                .background(ReclaimTeal2)
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.Filled.AutoAwesome,
-                contentDescription = null,
-                tint = ReclaimTeal,
-                modifier = Modifier.size(14.dp),
-            )
-            Spacer(Modifier.width(6.dp))
-            Text(
-                text = "+ ${earned.inWholeMinutes} min earned today",
-                color = ReclaimTeal,
-                fontSize = 12.5.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
+        if (showEarned) EarnedPill(earned = earned)
+        if (showEarned && showAvailable) Spacer(Modifier.width(8.dp))
+        if (showAvailable) AvailablePill(available = available)
+    }
+}
+
+@Composable
+private fun EarnedPill(earned: Duration) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(ReclaimTeal2)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.AutoAwesome,
+            contentDescription = null,
+            tint = ReclaimTeal,
+            modifier = Modifier.size(14.dp),
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = "+ ${earned.inWholeMinutes} min earned today",
+            color = ReclaimTeal,
+            fontSize = 12.5.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+@Composable
+private fun AvailablePill(available: Duration) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(ReclaimTeal3)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.AccessTime,
+            contentDescription = null,
+            tint = ReclaimTeal,
+            modifier = Modifier.size(14.dp),
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = "${available.inWholeMinutes} min available",
+            color = ReclaimTeal,
+            fontSize = 12.5.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 
@@ -187,6 +240,7 @@ internal fun HomeScreenContent(
     onMarkHabitComplete: (Long) -> Unit = {},
     blockingInactive: Boolean = false,
     onOpenOverlaySettings: () -> Unit = {},
+    rewardBalance: Duration = Duration.ZERO,
 ) {
     val exceeded = hasUsageAccess && todayScreenTime > dailyLimit
     val progress = when {
@@ -214,9 +268,7 @@ internal fun HomeScreenContent(
             emptyHint = if (!hasAddedApps) "Add apps to set your daily limit" else null,
             grantUsageAccess = if (!hasUsageAccess) onOpenUsageAccess else null,
         )
-        if (habitsSummary.earned > Duration.ZERO) {
-            EarnedPill(earned = habitsSummary.earned)
-        }
+        RewardPills(earned = habitsSummary.earned, available = rewardBalance)
         if (topApps.isNotEmpty()) {
             TopAppsSection(rows = topApps, onSeeAllApps = onSeeAllApps)
         }

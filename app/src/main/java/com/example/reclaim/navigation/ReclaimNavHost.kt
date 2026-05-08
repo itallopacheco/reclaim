@@ -89,6 +89,7 @@ fun ReclaimNavHost(
                     rankAppsForHome = app.rankAppsForHome,
                     habitsRepository = app.habits,
                     habitsSummary = app.habitsTodaySummary,
+                    currentRewardBalance = app.currentRewardBalance,
                     hasUsageAccess = { app.usageStats.hasUsageAccess() },
                     hasOverlayPermission = { Permissions.canDrawOverlays(context) },
                     onOpenUsageAccess = openUsageAccess,

@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import com.example.reclaim.R
 import com.example.reclaim.domain.apps.AddedApp
@@ -19,8 +20,12 @@ import com.example.reclaim.domain.apps.AppCatalog
 import com.example.reclaim.domain.apps.UsageStats
 import com.example.reclaim.domain.blocking.ForegroundAppMonitor
 import com.example.reclaim.domain.blocking.ShouldBlockAppUseCase
+import com.example.reclaim.domain.rewards.ApplyRewardSpendUseCase
+import com.example.reclaim.domain.rewards.CurrentRewardBalanceUseCase
 import com.example.reclaim.reclaimApplication
 import com.example.reclaim.ui.screen.BlockingActivity
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 class BlockingService : Service() {
@@ -31,7 +36,12 @@ class BlockingService : Service() {
     private lateinit var addedApps: AddedAppsRepository
     private lateinit var usageStats: UsageStats
     private lateinit var appCatalog: AppCatalog
+    private lateinit var applyRewardSpend: ApplyRewardSpendUseCase
+    private lateinit var currentRewardBalance: CurrentRewardBalanceUseCase
+    private lateinit var notificationManager: NotificationManager
     private var lastBlockedDispatched: String? = null
+    private var lastTickAtMillis: Long = -1L
+    private var lastNotificationText: String? = null
 
     private val tick = object : Runnable {
         override fun run() {
@@ -53,6 +63,9 @@ class BlockingService : Service() {
         addedApps = app.addedApps
         usageStats = app.usageStats
         appCatalog = app.appCatalog
+        applyRewardSpend = app.applyRewardSpend
+        currentRewardBalance = app.currentRewardBalance
+        notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         startForegroundWithNotification()
         handler.post(tick)
     }
@@ -74,8 +87,13 @@ class BlockingService : Service() {
         val current = foregroundAppMonitor.currentForegroundPackage()
         if (current == null) {
             lastBlockedDispatched = null
+            lastTickAtMillis = -1L
+            updateNotificationFor(null)
             return
         }
+        // PRD ordering: (1) spend, (2) isBlocked, (3) overlay.
+        spendIfQuotaExhausted(current)
+        updateNotificationFor(current)
         if (current != lastBlockedDispatched) {
             lastBlockedDispatched = null
         }
@@ -90,6 +108,19 @@ class BlockingService : Service() {
         }
         dispatchOverlay(current)
         lastBlockedDispatched = current
+    }
+
+    private fun spendIfQuotaExhausted(packageName: String) {
+        val nowMillis = SystemClock.elapsedRealtime()
+        val previousMillis = lastTickAtMillis
+        lastTickAtMillis = nowMillis
+        if (previousMillis < 0L) return
+        val elapsed = (nowMillis - previousMillis).milliseconds
+        if (elapsed <= Duration.ZERO) return
+        val added = addedApps.addedApps().firstOrNull { it.packageName == packageName } ?: return
+        val today = usageStats.usageToday()[packageName] ?: Duration.ZERO
+        if (today < added.dailyQuota) return
+        applyRewardSpend.invoke(elapsed)
     }
 
     private fun dispatchOverlay(packageName: String) {
@@ -108,9 +139,10 @@ class BlockingService : Service() {
     }
 
     private fun startForegroundWithNotification() {
-        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && nm.getNotificationChannel(CHANNEL_ID) == null) {
-            nm.createNotificationChannel(
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            notificationManager.getNotificationChannel(CHANNEL_ID) == null
+        ) {
+            notificationManager.createNotificationChannel(
                 NotificationChannel(
                     CHANNEL_ID,
                     "Reclaim",
@@ -118,12 +150,8 @@ class BlockingService : Service() {
                 ),
             )
         }
-        val notification: Notification = Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("Reclaim")
-            .setContentText("Reclaim está protegendo seus limites")
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setOngoing(true)
-            .build()
+        val notification = buildNotification(IDLE_NOTIFICATION_TEXT)
+        lastNotificationText = IDLE_NOTIFICATION_TEXT
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(
                 NOTIFICATION_ID,
@@ -135,11 +163,42 @@ class BlockingService : Service() {
         }
     }
 
+    private fun buildNotification(contentText: String): Notification =
+        Notification.Builder(this, CHANNEL_ID)
+            .setContentTitle("Reclaim")
+            .setContentText(contentText)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setOngoing(true)
+            .build()
+
+    private fun updateNotificationFor(packageName: String?) {
+        val text = if (packageName != null && isQuotaExhausted(packageName)) {
+            val balance = currentRewardBalance.invoke()
+            if (balance > Duration.ZERO) {
+                "Saldo bônus: ${balance.inWholeMinutes} min restantes"
+            } else {
+                IDLE_NOTIFICATION_TEXT
+            }
+        } else {
+            IDLE_NOTIFICATION_TEXT
+        }
+        if (text == lastNotificationText) return
+        lastNotificationText = text
+        notificationManager.notify(NOTIFICATION_ID, buildNotification(text))
+    }
+
+    private fun isQuotaExhausted(packageName: String): Boolean {
+        val added = addedApps.addedApps().firstOrNull { it.packageName == packageName } ?: return false
+        val today = usageStats.usageToday()[packageName] ?: Duration.ZERO
+        return today >= added.dailyQuota
+    }
+
     companion object {
         private const val TAG = "BlockingService"
         private const val CHANNEL_ID = "reclaim_blocking"
         private const val NOTIFICATION_ID = 1001
         private val POLL_INTERVAL = 1.seconds
+        private const val IDLE_NOTIFICATION_TEXT = "Reclaim está protegendo seus limites"
 
         fun start(context: Context) {
             val intent = Intent(context, BlockingService::class.java)
