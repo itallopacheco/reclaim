@@ -10,6 +10,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.example.reclaim.data.DataStoreAddedAppsRepository
 import com.example.reclaim.data.DataStoreHabitsRepository
 import com.example.reclaim.data.DataStoreRewardsRepository
+import com.example.reclaim.data.RewardingHabitsRepository
 import com.example.reclaim.data.PackageManagerAppCatalog
 import com.example.reclaim.data.UsageEventsForegroundAppMonitor
 import com.example.reclaim.data.UsageStatsManagerStats
@@ -85,7 +86,10 @@ class ReclaimApplication : Application() {
     }
 
     val habits: HabitsRepository by lazy {
-        DataStoreHabitsRepository(habitsDataStore)
+        RewardingHabitsRepository(
+            inner = DataStoreHabitsRepository(habitsDataStore),
+            rewards = rewards,
+        )
     }
 
     val habitsTodaySummary: HabitsTodaySummaryUseCase
