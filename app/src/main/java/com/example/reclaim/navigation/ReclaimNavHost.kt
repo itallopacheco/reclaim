@@ -31,6 +31,7 @@ import com.example.reclaim.ui.screen.AddAppSheet
 import com.example.reclaim.ui.screen.AddHabitSheet
 import com.example.reclaim.ui.screen.AppsScreen
 import com.example.reclaim.ui.screen.EditAppSheet
+import com.example.reclaim.ui.screen.EditHabitSheet
 import com.example.reclaim.ui.screen.HabitsScreen
 import com.example.reclaim.ui.screen.HomeScreen
 import com.example.reclaim.ui.screen.LockScreen
@@ -105,6 +106,8 @@ fun ReclaimNavHost(
             }
         }
         composable(Destination.Habits.route) {
+            var refreshTick by remember { mutableIntStateOf(0) }
+            OnResume { refreshTick++ }
             MainScaffold(
                 navController = navController,
                 currentTab = TabDestination.Habits,
@@ -114,7 +117,10 @@ fun ReclaimNavHost(
                 HabitsScreen(
                     habitsRepository = app.habits,
                     summaryUseCase = app.habitsTodaySummary,
-                    onEditHabit = { /* wired later when EditHabit destination exists */ },
+                    onEditHabit = { id ->
+                        navController.navigate(Destination.EditHabit.routeFor(id))
+                    },
+                    refreshTick = refreshTick,
                 )
             }
         }
@@ -159,6 +165,29 @@ fun ReclaimNavHost(
                 },
                 onRequestRemove = {
                     app.addedApps.delete(packageName)
+                    navController.popBackStack()
+                },
+            )
+        }
+        composable(
+            route = Destination.EditHabit.route,
+            arguments = listOf(navArgument(Destination.EditHabit.ARG_ID) {
+                type = NavType.LongType
+            }),
+        ) { backStackEntry ->
+            val id = backStackEntry.arguments?.getLong(Destination.EditHabit.ARG_ID)
+                ?: return@composable
+            val habit = app.habits.habits().firstOrNull { it.id == id }
+                ?: return@composable
+            EditHabitSheet(
+                habit = habit,
+                onDismiss = { navController.popBackStack() },
+                onSave = { name, icon, reward ->
+                    app.habits.update(com.example.reclaim.domain.habits.Habit(id, name, icon, reward))
+                    navController.popBackStack()
+                },
+                onRequestRemove = {
+                    app.habits.delete(id)
                     navController.popBackStack()
                 },
             )
