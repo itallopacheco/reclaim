@@ -10,6 +10,8 @@ import java.time.ZoneId
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
+private data class ActiveSpan(val refcount: Int, val openedAt: Long)
+
 class UsageStatsManagerStats(
     private val usageStatsManager: UsageStatsManager,
     private val appOpsManager: AppOpsManager,
@@ -37,26 +39,36 @@ class UsageStatsManagerStats(
             .toInstant()
             .toEpochMilli()
         val events = usageStatsManager.queryEvents(startOfToday, now)
-        val openSessions = mutableMapOf<Pair<String, String>, Long>()
+        val openByPackage = mutableMapOf<String, ActiveSpan>()
         val totals = mutableMapOf<String, Long>()
         val event = UsageEvents.Event()
         while (events.getNextEvent(event)) {
-            val key = event.packageName to (event.className ?: "")
+            val pkg = event.packageName
             when (event.eventType) {
                 UsageEvents.Event.ACTIVITY_RESUMED,
                 UsageEvents.Event.FOREGROUND_SERVICE_START -> {
-                    openSessions[key] = event.timeStamp
+                    val current = openByPackage[pkg]
+                    openByPackage[pkg] = if (current == null) {
+                        ActiveSpan(refcount = 1, openedAt = event.timeStamp)
+                    } else {
+                        current.copy(refcount = current.refcount + 1)
+                    }
                 }
                 UsageEvents.Event.ACTIVITY_PAUSED,
                 UsageEvents.Event.ACTIVITY_STOPPED,
                 UsageEvents.Event.FOREGROUND_SERVICE_STOP -> {
-                    val start = openSessions.remove(key) ?: continue
-                    totals.merge(event.packageName, event.timeStamp - start, Long::plus)
+                    val current = openByPackage[pkg] ?: continue
+                    if (current.refcount <= 1) {
+                        totals.merge(pkg, event.timeStamp - current.openedAt, Long::plus)
+                        openByPackage.remove(pkg)
+                    } else {
+                        openByPackage[pkg] = current.copy(refcount = current.refcount - 1)
+                    }
                 }
             }
         }
-        for ((key, start) in openSessions) {
-            totals.merge(key.first, now - start, Long::plus)
+        for ((pkg, span) in openByPackage) {
+            totals.merge(pkg, now - span.openedAt, Long::plus)
         }
         return totals.mapValues { (_, ms) -> ms.milliseconds }
     }

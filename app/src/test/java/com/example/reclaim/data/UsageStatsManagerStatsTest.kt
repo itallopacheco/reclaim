@@ -134,6 +134,49 @@ class UsageStatsManagerStatsTest {
         assertEquals(mapOf("com.example.foo" to 10.minutes), stats.usageToday())
     }
 
+    @Test
+    fun `usageToday does not double count overlapping activity and service`() {
+        setUsageAccessMode(AppOpsManager.MODE_ALLOWED)
+        val now = System.currentTimeMillis()
+        val t0 = now - 30.minutes.inWholeMilliseconds
+        val shadow = shadowOf(usageStatsManager)
+        shadow.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage("com.example.foo")
+                .setClass("com.example.foo.MainActivity")
+                .setEventType(UsageEvents.Event.ACTIVITY_RESUMED)
+                .setTimeStamp(t0)
+                .build()
+        )
+        shadow.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage("com.example.foo")
+                .setClass("com.example.foo.PlayerService")
+                .setEventType(UsageEvents.Event.FOREGROUND_SERVICE_START)
+                .setTimeStamp(t0 + 1.minutes.inWholeMilliseconds)
+                .build()
+        )
+        shadow.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage("com.example.foo")
+                .setClass("com.example.foo.MainActivity")
+                .setEventType(UsageEvents.Event.ACTIVITY_PAUSED)
+                .setTimeStamp(t0 + 5.minutes.inWholeMilliseconds)
+                .build()
+        )
+        shadow.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage("com.example.foo")
+                .setClass("com.example.foo.PlayerService")
+                .setEventType(UsageEvents.Event.FOREGROUND_SERVICE_STOP)
+                .setTimeStamp(t0 + 5.minutes.inWholeMilliseconds)
+                .build()
+        )
+        val stats = UsageStatsManagerStats(usageStatsManager, appOps, context.packageName)
+
+        assertEquals(mapOf("com.example.foo" to 5.minutes), stats.usageToday())
+    }
+
     private fun buildUsageStats(packageName: String, totalForegroundMs: Long): UsageStats {
         val now = System.currentTimeMillis()
         return ShadowUsageStatsManager.UsageStatsBuilder.newBuilder()
