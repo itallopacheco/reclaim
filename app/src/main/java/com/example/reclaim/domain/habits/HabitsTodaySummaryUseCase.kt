@@ -4,15 +4,14 @@ import kotlin.time.Duration
 
 class HabitsTodaySummaryUseCase(private val habits: HabitsRepository) {
     fun invoke(): HabitsTodaySummary {
+        val all = habits.habits()
         val completedIds = habits.completionsToday().keys
-        val earned = habits.habits()
-            .filter { it.id in completedIds }
-            .fold(Duration.ZERO) { acc, h -> acc + h.reward }
+        val (done, pending) = all.partition { it.id in completedIds }
         return HabitsTodaySummary(
-            earned = earned,
-            completed = 0,
-            total = 0,
-            available = Duration.ZERO,
+            earned = done.fold(Duration.ZERO) { acc, h -> acc + h.reward },
+            completed = done.size,
+            total = all.size,
+            available = pending.fold(Duration.ZERO) { acc, h -> acc + h.reward },
         )
     }
 }

@@ -20,4 +20,23 @@ class HabitsTodaySummaryUseCaseTest {
 
         assertEquals(30.minutes, summary.earned)
     }
+
+    @Test
+    fun `summary reports completed count, total count, and available minutes`() {
+        val a = Habit(1L, "A", HabitIcon.BOOK_OPEN, 30.minutes)
+        val b = Habit(2L, "B", HabitIcon.DUMBBELL, 45.minutes)
+        val c = Habit(3L, "C", HabitIcon.SUN, 15.minutes)
+        val d = Habit(4L, "D", HabitIcon.PEN_LINE, 10.minutes)
+        val repo = FakeHabitsRepository(
+            initial = listOf(a, b, c, d),
+            initialCompletions = mapOf(1L to 0, 3L to 0),
+        )
+
+        val summary = HabitsTodaySummaryUseCase(repo).invoke()
+
+        assertEquals(
+            HabitsTodaySummary(earned = 45.minutes, completed = 2, total = 4, available = 55.minutes),
+            summary,
+        )
+    }
 }
