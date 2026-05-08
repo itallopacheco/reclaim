@@ -12,7 +12,8 @@ class RankAppsForHomeUseCase(
         val usageMap = usageStats.usageToday()
         return addedApps.addedApps()
             .map { addedApp ->
-                val app = catalogMap.getValue(addedApp.packageName)
+                val app = catalogMap[addedApp.packageName]
+                    ?: App(addedApp.packageName, addedApp.packageName, isLauncherApp = true)
                 val today = usageMap.getValue(addedApp.packageName)
                 HomeAppRow(app, today, addedApp.dailyQuota, status(today, addedApp.dailyQuota))
             }

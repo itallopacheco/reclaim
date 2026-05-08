@@ -39,6 +39,22 @@ class RankAppsForHomeUseCaseTest {
     }
 
     @Test
+    fun `falls back to package name as display name when not in catalog`() {
+        val repo = FakeAddedAppsRepository().apply {
+            add(AddedApp("com.unknown.app", 1.hours))
+        }
+        val usage = FakeUsageStats(
+            avgs = emptyMap(),
+            today = mapOf("com.unknown.app" to 30.minutes),
+        )
+        val catalog = FakeAppCatalog(emptyList())
+
+        val result = RankAppsForHomeUseCase(repo, usage, catalog).invoke()
+
+        assertEquals("com.unknown.app", result.single().app.displayName)
+    }
+
+    @Test
     fun `breaks usage ties by display name ascending`() {
         val tiktok = App("com.zhiliaoapp.musically", "TikTok", isLauncherApp = true)
         val instagram = App("com.instagram.android", "Instagram", isLauncherApp = true)
