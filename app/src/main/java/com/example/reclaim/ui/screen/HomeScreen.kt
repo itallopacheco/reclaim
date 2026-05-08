@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.reclaim.domain.apps.AddedAppsRepository
 import com.example.reclaim.domain.apps.HomeAppRow
+import com.example.reclaim.domain.apps.HomeAppStatus
 import com.example.reclaim.domain.apps.TodayScreenTimeUseCase
 import com.example.reclaim.ui.theme.ReclaimBg
 import com.example.reclaim.ui.theme.ReclaimInk
@@ -131,9 +132,24 @@ internal fun HomeScreenContent(
 @Composable
 private fun TopAppsSection(rows: List<HomeAppRow>, onSeeAllApps: () -> Unit) {
     Column {
+        Row {
+            Text(text = "Top apps", modifier = Modifier.weight(1f))
+            TextButton(onClick = onSeeAllApps) { Text(text = "See all") }
+        }
         rows.forEach { row ->
-            Text(text = row.app.displayName)
-            Text(text = "${formatScreenTime(row.today)} / ${formatScreenTime(row.quota)}")
+            val statusSuffix = when (row.status) {
+                HomeAppStatus.OVER -> "exceeded"
+                HomeAppStatus.WARN -> "near quota"
+                HomeAppStatus.OK -> "within quota"
+            }
+            Column(
+                modifier = Modifier.semantics {
+                    contentDescription = "${row.app.displayName}, $statusSuffix"
+                },
+            ) {
+                Text(text = row.app.displayName)
+                Text(text = "${formatScreenTime(row.today)} / ${formatScreenTime(row.quota)}")
+            }
         }
     }
 }
