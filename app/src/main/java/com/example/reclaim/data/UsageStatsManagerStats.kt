@@ -37,23 +37,25 @@ class UsageStatsManagerStats(
             .toInstant()
             .toEpochMilli()
         val events = usageStatsManager.queryEvents(startOfToday, now)
-        val openActivities = mutableMapOf<Pair<String, String>, Long>()
+        val openSessions = mutableMapOf<Pair<String, String>, Long>()
         val totals = mutableMapOf<String, Long>()
         val event = UsageEvents.Event()
         while (events.getNextEvent(event)) {
             val key = event.packageName to (event.className ?: "")
             when (event.eventType) {
-                UsageEvents.Event.ACTIVITY_RESUMED -> {
-                    openActivities[key] = event.timeStamp
+                UsageEvents.Event.ACTIVITY_RESUMED,
+                UsageEvents.Event.FOREGROUND_SERVICE_START -> {
+                    openSessions[key] = event.timeStamp
                 }
                 UsageEvents.Event.ACTIVITY_PAUSED,
-                UsageEvents.Event.ACTIVITY_STOPPED -> {
-                    val start = openActivities.remove(key) ?: continue
+                UsageEvents.Event.ACTIVITY_STOPPED,
+                UsageEvents.Event.FOREGROUND_SERVICE_STOP -> {
+                    val start = openSessions.remove(key) ?: continue
                     totals.merge(event.packageName, event.timeStamp - start, Long::plus)
                 }
             }
         }
-        for ((key, start) in openActivities) {
+        for ((key, start) in openSessions) {
             totals.merge(key.first, now - start, Long::plus)
         }
         return totals.mapValues { (_, ms) -> ms.milliseconds }
