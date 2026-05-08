@@ -1,6 +1,7 @@
 package com.example.reclaim.data
 
 import android.app.AppOpsManager
+import android.app.usage.UsageEvents
 import android.app.usage.UsageStats
 import android.app.usage.UsageStatsManager
 import android.content.Context
@@ -15,6 +16,8 @@ import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowUsageStatsManager
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -75,6 +78,33 @@ class UsageStatsManagerStatsTest {
         val stats = UsageStatsManagerStats(usageStatsManager, appOps, context.packageName)
 
         assertEquals(mapOf("com.example.foo" to 1.hours), stats.avgDailyUsageLast7Days())
+    }
+
+    @Test
+    fun `usageToday returns duration of single activity session`() {
+        setUsageAccessMode(AppOpsManager.MODE_ALLOWED)
+        val now = System.currentTimeMillis()
+        val t0 = now - 10.minutes.inWholeMilliseconds
+        val shadow = shadowOf(usageStatsManager)
+        shadow.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage("com.example.foo")
+                .setClass("com.example.foo.MainActivity")
+                .setEventType(UsageEvents.Event.ACTIVITY_RESUMED)
+                .setTimeStamp(t0)
+                .build()
+        )
+        shadow.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage("com.example.foo")
+                .setClass("com.example.foo.MainActivity")
+                .setEventType(UsageEvents.Event.ACTIVITY_PAUSED)
+                .setTimeStamp(t0 + 5.minutes.inWholeMilliseconds)
+                .build()
+        )
+        val stats = UsageStatsManagerStats(usageStatsManager, appOps, context.packageName)
+
+        assertEquals(mapOf("com.example.foo" to 5.minutes), stats.usageToday())
     }
 
     private fun buildUsageStats(packageName: String, totalForegroundMs: Long): UsageStats {
