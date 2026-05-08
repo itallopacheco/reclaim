@@ -58,7 +58,12 @@ class ReclaimApplication : Application() {
         get() = TodayScreenTimeUseCase(addedApps = addedApps, usageStats = usageStats)
 
     val rankAppsForHome: RankAppsForHomeUseCase
-        get() = RankAppsForHomeUseCase(addedApps = addedApps, usageStats = usageStats, catalog = appCatalog)
+        get() = RankAppsForHomeUseCase(
+            addedApps = addedApps,
+            usageStats = usageStats,
+            catalog = appCatalog,
+            blockingDecision = shouldBlockApp,
+        )
 
     val shouldBlockApp: ShouldBlockAppUseCase
         get() = ShouldBlockAppUseCase(addedApps = addedApps, usageStats = usageStats)

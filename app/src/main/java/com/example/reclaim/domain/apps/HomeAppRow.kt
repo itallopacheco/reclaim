@@ -7,4 +7,5 @@ data class HomeAppRow(
     val today: Duration,
     val quota: Duration,
     val status: HomeAppStatus,
+    val isBlockingNow: Boolean = false,
 )
