@@ -7,5 +7,9 @@ class ShouldBlockAppUseCase(
     private val addedApps: AddedAppsRepository,
     private val usageStats: UsageStats,
 ) {
-    fun invoke(packageName: String): Boolean = false
+    fun invoke(packageName: String): Boolean {
+        val added = addedApps.addedApps().firstOrNull { it.packageName == packageName } ?: return false
+        val today = usageStats.usageToday().getValue(packageName)
+        return today >= added.dailyQuota
+    }
 }
