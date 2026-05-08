@@ -2,19 +2,24 @@ package com.example.reclaim.ui.screen
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Notifications
@@ -39,8 +44,13 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.reclaim.domain.apps.AddedAppsRepository
+import com.example.reclaim.domain.apps.HomeAppRow
+import com.example.reclaim.domain.apps.HomeAppStatus
+import com.example.reclaim.domain.apps.RankAppsForHomeUseCase
 import com.example.reclaim.domain.apps.TodayScreenTimeUseCase
+import com.example.reclaim.ui.theme.ReclaimAmber
 import com.example.reclaim.ui.theme.ReclaimBg
+import com.example.reclaim.ui.theme.ReclaimGreen
 import com.example.reclaim.ui.theme.ReclaimInk
 import com.example.reclaim.ui.theme.ReclaimInk2
 import com.example.reclaim.ui.theme.ReclaimInk3
@@ -57,8 +67,10 @@ import kotlin.time.Duration
 fun HomeScreen(
     addedApps: AddedAppsRepository,
     todayScreenTime: TodayScreenTimeUseCase,
+    rankAppsForHome: RankAppsForHomeUseCase,
     hasUsageAccess: () -> Boolean,
     onOpenUsageAccess: () -> Unit,
+    onSeeAllApps: () -> Unit,
     refreshTick: Int = 0,
 ) {
     @Suppress("UNUSED_EXPRESSION") refreshTick
@@ -66,6 +78,7 @@ fun HomeScreen(
     val limit = added.fold(Duration.ZERO) { acc, app -> acc + app.dailyQuota }
     val today = todayScreenTime.invoke()
     val accessGranted = hasUsageAccess()
+    val rankedRows = if (accessGranted && added.isNotEmpty()) rankAppsForHome.invoke() else emptyList()
 
     HomeScreenContent(
         todayScreenTime = today,
@@ -73,6 +86,8 @@ fun HomeScreen(
         hasUsageAccess = accessGranted,
         hasAddedApps = added.isNotEmpty(),
         onOpenUsageAccess = onOpenUsageAccess,
+        topApps = rankedRows,
+        onSeeAllApps = onSeeAllApps,
     )
 }
 
@@ -94,6 +109,8 @@ internal fun HomeScreenContent(
     hasAddedApps: Boolean,
     onOpenUsageAccess: () -> Unit,
     today: LocalDate = LocalDate.now(),
+    topApps: List<HomeAppRow> = emptyList(),
+    onSeeAllApps: () -> Unit = {},
 ) {
     val exceeded = hasUsageAccess && todayScreenTime > dailyLimit
     val progress = when {
@@ -118,7 +135,137 @@ internal fun HomeScreenContent(
             emptyHint = if (!hasAddedApps) "Add apps to set your daily limit" else null,
             grantUsageAccess = if (!hasUsageAccess) onOpenUsageAccess else null,
         )
+        if (topApps.isNotEmpty()) {
+            TopAppsSection(rows = topApps, onSeeAllApps = onSeeAllApps)
+        }
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun TopAppsSection(rows: List<HomeAppRow>, onSeeAllApps: () -> Unit) {
+    Column(modifier = Modifier.padding(top = 36.dp, start = 24.dp, end = 24.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Top apps",
+                color = ReclaimInk,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = "See all",
+                color = ReclaimInk3,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.clickable(onClick = onSeeAllApps),
+            )
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(ReclaimBg)
+                .border(1.dp, ReclaimLine, RoundedCornerShape(14.dp)),
+        ) {
+            rows.forEachIndexed { index, row ->
+                if (index > 0) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(ReclaimLine),
+                    )
+                }
+                TopAppRow(row = row)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TopAppRow(row: HomeAppRow) {
+    val statusColor = when (row.status) {
+        HomeAppStatus.OVER -> ReclaimRed
+        HomeAppStatus.WARN -> ReclaimAmber
+        HomeAppStatus.OK -> ReclaimGreen
+    }
+    val labelColor = when (row.status) {
+        HomeAppStatus.OVER -> ReclaimRed
+        HomeAppStatus.WARN -> ReclaimAmber
+        HomeAppStatus.OK -> ReclaimInk2
+    }
+    val statusSuffix = when (row.status) {
+        HomeAppStatus.OVER -> "exceeded"
+        HomeAppStatus.WARN -> "near quota"
+        HomeAppStatus.OK -> "within quota"
+    }
+    val progressFraction = if (row.status == HomeAppStatus.OVER) {
+        1f
+    } else {
+        (row.today / row.quota).toFloat().coerceIn(0f, 1f)
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(14.dp)
+            .semantics { contentDescription = "${row.app.displayName}, $statusSuffix" },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(ReclaimInk),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = row.app.displayName.take(2),
+                color = ReclaimBg,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = row.app.displayName,
+                    color = ReclaimInk,
+                    fontSize = 14.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = "${formatScreenTime(row.today)} / ${formatScreenTime(row.quota)}",
+                    color = labelColor,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Spacer(Modifier.height(6.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(ReclaimLine),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(progressFraction)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(statusColor),
+                )
+            }
+        }
     }
 }
 
