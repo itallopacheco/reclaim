@@ -521,6 +521,86 @@ class HomeScreenTest {
     }
 
     @Test
+    fun availablePillShowsBalanceWhenAboveZero() {
+        composeRule.setContent {
+            ReclaimTheme {
+                HomeScreenContent(
+                    todayScreenTime = 1.hours,
+                    dailyLimit = 2.hours,
+                    hasUsageAccess = true,
+                    hasAddedApps = true,
+                    onOpenUsageAccess = {},
+                    rewardBalance = 30.minutes,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("30 min available").assertIsDisplayed()
+    }
+
+    @Test
+    fun availablePillHiddenWhenBalanceIsZero() {
+        composeRule.setContent {
+            ReclaimTheme {
+                HomeScreenContent(
+                    todayScreenTime = 1.hours,
+                    dailyLimit = 2.hours,
+                    hasUsageAccess = true,
+                    hasAddedApps = true,
+                    onOpenUsageAccess = {},
+                    rewardBalance = Duration.ZERO,
+                )
+            }
+        }
+
+        composeRule.onAllNodesWithText("available", substring = true).assertCountEquals(0)
+    }
+
+    @Test
+    fun availablePillHiddenWhenBalanceIsNegative() {
+        composeRule.setContent {
+            ReclaimTheme {
+                HomeScreenContent(
+                    todayScreenTime = 1.hours,
+                    dailyLimit = 2.hours,
+                    hasUsageAccess = true,
+                    hasAddedApps = true,
+                    onOpenUsageAccess = {},
+                    rewardBalance = (-5).minutes,
+                )
+            }
+        }
+
+        composeRule.onAllNodesWithText("available", substring = true).assertCountEquals(0)
+    }
+
+    @Test
+    fun earnedAndAvailablePillsCoexist() {
+        composeRule.setContent {
+            ReclaimTheme {
+                HomeScreenContent(
+                    todayScreenTime = 1.hours,
+                    dailyLimit = 2.hours,
+                    hasUsageAccess = true,
+                    hasAddedApps = true,
+                    onOpenUsageAccess = {},
+                    habitsSummary = HabitsTodaySummary(
+                        earned = 25.minutes,
+                        completed = 1,
+                        total = 2,
+                        available = 30.minutes,
+                        nextPending = Habit(2L, "Workout", HabitIcon.DUMBBELL, 30.minutes),
+                    ),
+                    rewardBalance = 30.minutes,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("+ 25 min earned today").assertIsDisplayed()
+        composeRule.onNodeWithText("30 min available").assertIsDisplayed()
+    }
+
+    @Test
     fun tappingGrantInBannerInvokesOpenOverlaySettings() {
         var fired = false
         composeRule.setContent {
