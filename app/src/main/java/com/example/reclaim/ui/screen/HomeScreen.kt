@@ -21,6 +21,9 @@ import com.example.reclaim.ui.theme.ReclaimInk
 import com.example.reclaim.ui.theme.ReclaimRed
 import com.example.reclaim.ui.theme.ReclaimTeal
 import com.example.reclaim.ui.theme.ReclaimTheme
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlin.time.Duration
 
 @Composable
@@ -57,6 +60,9 @@ private fun formatScreenTime(d: Duration): String {
     return if (m == 0) "${h}h" else "${h}h ${m}m"
 }
 
+private val HEADER_DATE_FORMATTER: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.ENGLISH)
+
 @Composable
 internal fun HomeScreenContent(
     todayScreenTime: Duration,
@@ -64,9 +70,12 @@ internal fun HomeScreenContent(
     hasUsageAccess: Boolean,
     hasAddedApps: Boolean,
     onOpenUsageAccess: () -> Unit,
+    today: LocalDate = LocalDate.now(),
 ) {
     val exceeded = hasUsageAccess && todayScreenTime > dailyLimit
     Column {
+        Text(text = today.format(HEADER_DATE_FORMATTER).uppercase(Locale.ENGLISH))
+        Text(text = "Good afternoon")
         Text(
             text = if (hasUsageAccess) formatScreenTime(todayScreenTime) else "—",
             color = if (exceeded) ReclaimRed else ReclaimInk,

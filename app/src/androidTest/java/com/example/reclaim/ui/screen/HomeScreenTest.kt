@@ -9,10 +9,10 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.example.reclaim.ui.theme.ReclaimTheme
+import java.time.LocalDate
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -111,6 +111,25 @@ class HomeScreenTest {
         composeRule.onNodeWithText("Grant usage access").performClick()
 
         assertTrue(fired)
+    }
+
+    @Test
+    fun headerShowsUppercaseDateAndGoodAfternoonGreeting() {
+        composeRule.setContent {
+            ReclaimTheme {
+                HomeScreenContent(
+                    today = LocalDate.of(2026, 5, 5),
+                    todayScreenTime = 1.hours + 30.minutes,
+                    dailyLimit = 3.hours,
+                    hasUsageAccess = true,
+                    hasAddedApps = true,
+                    onOpenUsageAccess = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("TUESDAY, MAY 5").assertIsDisplayed()
+        composeRule.onNodeWithText("Good afternoon").assertIsDisplayed()
     }
 
     @Test
