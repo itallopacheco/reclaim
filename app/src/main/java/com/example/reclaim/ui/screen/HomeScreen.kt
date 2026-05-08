@@ -51,6 +51,7 @@ fun HomeScreen(onSeeAllApps: () -> Unit) {
 }
 
 private fun formatScreenTime(d: Duration): String {
+    if (d == Duration.ZERO) return "0h 0m"
     val h = d.inWholeHours
     val m = (d.inWholeMinutes % 60).toInt()
     return if (m == 0) "${h}h" else "${h}h ${m}m"
@@ -73,7 +74,11 @@ internal fun HomeScreenContent(
                 contentDescription = if (exceeded) "Screen time today, exceeded" else "Screen time today"
             },
         )
-        Text(text = "of your ${formatScreenTime(dailyLimit)} daily limit")
+        if (hasAddedApps) {
+            Text(text = "of your ${formatScreenTime(dailyLimit)} daily limit")
+        } else {
+            Text(text = "Add apps to set your daily limit")
+        }
     }
 }
 
