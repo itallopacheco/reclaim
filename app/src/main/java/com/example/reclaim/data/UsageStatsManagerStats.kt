@@ -1,6 +1,7 @@
 package com.example.reclaim.data
 
 import android.app.AppOpsManager
+import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.os.Process
 import com.example.reclaim.domain.apps.UsageStats
@@ -35,11 +36,27 @@ class UsageStatsManagerStats(
             .atStartOfDay(ZoneId.systemDefault())
             .toInstant()
             .toEpochMilli()
-        val raw = usageStatsManager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, startOfToday, now)
-            ?: return emptyMap()
-        return raw
-            .groupBy { it.packageName }
-            .mapValues { (_, entries) -> entries.sumOf { it.totalTimeInForeground }.milliseconds }
+        val events = usageStatsManager.queryEvents(startOfToday, now)
+        val openActivities = mutableMapOf<Pair<String, String>, Long>()
+        val totals = mutableMapOf<String, Long>()
+        val event = UsageEvents.Event()
+        while (events.getNextEvent(event)) {
+            val key = event.packageName to (event.className ?: "")
+            when (event.eventType) {
+                UsageEvents.Event.ACTIVITY_RESUMED -> {
+                    openActivities[key] = event.timeStamp
+                }
+                UsageEvents.Event.ACTIVITY_PAUSED,
+                UsageEvents.Event.ACTIVITY_STOPPED -> {
+                    val start = openActivities.remove(key) ?: continue
+                    totals.merge(event.packageName, event.timeStamp - start, Long::plus)
+                }
+            }
+        }
+        for ((key, start) in openActivities) {
+            totals.merge(key.first, now - start, Long::plus)
+        }
+        return totals.mapValues { (_, ms) -> ms.milliseconds }
     }
 
     fun hasUsageAccess(): Boolean {
