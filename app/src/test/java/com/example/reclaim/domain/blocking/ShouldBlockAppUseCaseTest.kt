@@ -46,4 +46,18 @@ class ShouldBlockAppUseCaseTest {
 
         assertTrue(useCase.invoke("x"))
     }
+
+    @Test
+    fun `returns true when usage today exceeds quota`() {
+        val repo = FakeAddedAppsRepository().apply {
+            add(AddedApp(packageName = "x", dailyQuota = 30.minutes))
+        }
+        val stats = FakeUsageStats(
+            avgs = emptyMap(),
+            today = mapOf("x" to 45.minutes),
+        )
+        val useCase = ShouldBlockAppUseCase(repo, stats)
+
+        assertTrue(useCase.invoke("x"))
+    }
 }
