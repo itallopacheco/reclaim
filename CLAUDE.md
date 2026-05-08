@@ -48,6 +48,7 @@ For UI iteration prefer Android Studio's `@Preview` over running the app — eve
 ```
 app/src/main/java/com/example/reclaim/
 ├── MainActivity.kt              # entry point, hosts ReclaimNavHost under ReclaimTheme
+├── ReclaimApplication.kt        # DI root; lazy adapters + use cases, reached via context.reclaimApplication()
 ├── navigation/
 │   ├── Destinations.kt          # sealed Destination(route) + TabDestination enum
 │   └── ReclaimNavHost.kt        # NavHost wiring; screens get callbacks, not NavController
@@ -56,19 +57,20 @@ app/src/main/java/com/example/reclaim/
 │       ├── App.kt, SuggestedApp.kt, AddedApp.kt
 │       ├── AppCatalog.kt, UsageStats.kt, AddedAppsRepository.kt   # interfaces
 │       ├── SuggestAppsUseCase.kt
-│       └── SearchAppsUseCase.kt
+│       ├── SearchAppsUseCase.kt
+│       └── TodayScreenTimeUseCase.kt   # sums today's usage across added apps (Home hero ring)
 ├── data/                        # adapters that implement the domain interfaces
-│   ├── DemoAppCatalog.kt        # static list of 10 popular apps (bootstrap; replaced in fatia C)
-│   ├── DemoUsageStats.kt        # static avg-usage map matching the demo catalog
-│   └── InMemoryAddedAppsRepository.kt   # process-lifetime store; idempotent add() by packageName
+│   ├── PackageManagerAppCatalog.kt     # queries Intent.ACTION_MAIN + CATEGORY_LAUNCHER, excludes Reclaim
+│   ├── UsageStatsManagerStats.kt       # queryUsageStats(INTERVAL_DAILY) for 7-day avg + today
+│   └── DataStoreAddedAppsRepository.kt # persists AddedApp via Jetpack DataStore Preferences
 └── ui/
     ├── main/
     │   └── MainScaffold.kt      # tab bar host (Home / Apps / Habits) + FAB
     ├── screen/                  # one file per screen, public @Composable
     │   ├── OnboardingValueScreen.kt, OnboardingPermissionsScreen.kt
     │   ├── HomeScreen.kt, AppsScreen.kt, HabitsScreen.kt
-    │   ├── AddAppSheet.kt, AddHabitSheet.kt    # ModalBottomSheet routes
-    │   └── LockScreen.kt        # full design translation, the rest are stubs
+    │   ├── AddAppSheet.kt, EditAppSheet.kt, AddHabitSheet.kt   # ModalBottomSheet routes
+    │   └── LockScreen.kt        # full design translation, HabitsScreen still a stub
     └── theme/
         ├── Color.kt             # Reclaim* design tokens
         ├── Theme.kt             # ReclaimTheme, light-only, no dynamic color
@@ -83,9 +85,11 @@ Three loose layers. No DI framework yet, no ViewModels yet.
 
 - **`ui/`** — Compose screens and the tab scaffold. Screens are pure presentation: state via `remember`, navigation via callbacks. Screens consume domain interfaces directly (constructor parameters), no ViewModel layer.
 - **`domain/`** — pure Kotlin/JVM. Use cases (`class Foo(deps...) { fun invoke(...) }`) operating on data classes (`App`, `SuggestedApp`, `AddedApp`). Dependencies are interfaces (`AppCatalog`, `UsageStats`, `AddedAppsRepository`).
-- **`data/`** — adapters implementing the domain interfaces. Today: `Demo*` static singletons + `InMemoryAddedAppsRepository`. Fatia C will swap these for `PackageManagerAppCatalog`, `UsageStatsManagerStats`, `DataStoreAddedAppsRepository`. Filters that depend on real-world knowledge (e.g. excluding Reclaim's own package) belong here, **not** in the domain.
+- **`data/`** — adapters implementing the domain interfaces. Live adapters: `PackageManagerAppCatalog`, `UsageStatsManagerStats`, `DataStoreAddedAppsRepository`. Filters that depend on real-world knowledge (e.g. excluding Reclaim's own package) belong here, **not** in the domain.
 
-Domain code is tested in pure JVM with hand-rolled fakes in `app/src/test/.../domain/apps/fakes/`. No mocking framework, no Robolectric in the domain tests.
+`ReclaimApplication` is the DI root — it owns the lazy adapter instances and exposes use cases as properties. Screens reach it via `context.reclaimApplication()` and receive the dependencies they need through `ReclaimNavHost`. No DI framework, no ViewModels.
+
+Domain code is tested in pure JVM with hand-rolled fakes in `app/src/test/.../domain/apps/fakes/`. Data adapters are tested with Robolectric in `app/src/test/.../data/`.
 
 ## Conventions
 
@@ -111,16 +115,23 @@ Layout:
 
 ```
 app/src/test/java/com/example/reclaim/
-└── domain/apps/
-    ├── SuggestAppsUseCaseTest.kt          # 6 tests
-    ├── SearchAppsUseCaseTest.kt           # 4 tests
-    └── fakes/
-        ├── FakeAppCatalog.kt
-        ├── FakeUsageStats.kt
-        └── FakeAddedAppsRepository.kt
+├── domain/apps/
+│   ├── SuggestAppsUseCaseTest.kt          # 6 tests
+│   ├── SearchAppsUseCaseTest.kt           # 4 tests
+│   ├── TodayScreenTimeUseCaseTest.kt      # 2 tests
+│   └── fakes/
+│       ├── FakeAppCatalog.kt
+│       ├── FakeUsageStats.kt
+│       └── FakeAddedAppsRepository.kt
+└── data/                                   # Robolectric-backed adapter tests
+    ├── PackageManagerAppCatalogTest.kt
+    ├── UsageStatsManagerStatsTest.kt
+    └── DataStoreAddedAppsRepositoryTest.kt
 
 app/src/androidTest/java/com/example/reclaim/ui/screen/
 ├── AddAppSheetTest.kt                     # 10 Compose UI tests
+├── EditAppSheetTest.kt                    # 6 Compose UI tests
+├── HomeScreenTest.kt                      # 7 Compose UI tests
 └── fakes/                                 # in-memory mutable fakes for UI
     ├── FakeAppCatalog.kt
     ├── FakeUsageStats.kt

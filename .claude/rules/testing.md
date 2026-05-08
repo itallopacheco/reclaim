@@ -9,10 +9,11 @@ paths:
 
 ## Current state
 
-Two real test suites live in this repo:
+Three real test suites live in this repo:
 
-- **JVM domain tests** at `app/src/test/java/com/example/reclaim/domain/apps/` — 10 tests covering `SuggestAppsUseCase` and `SearchAppsUseCase`. Hand-rolled immutable fakes in `fakes/`. Pure JVM, no Android framework.
-- **Compose UI tests** at `app/src/androidTest/java/com/example/reclaim/ui/screen/` — 10 tests in `AddAppSheetTest.kt` covering the add-app modal end-to-end. Mutable in-memory fakes in `fakes/` (separate from the JVM ones because `androidTest` and `test` source sets don't share code).
+- **JVM domain tests** at `app/src/test/java/com/example/reclaim/domain/apps/` — 12 tests covering `SuggestAppsUseCase` (6), `SearchAppsUseCase` (4), and `TodayScreenTimeUseCase` (2). Hand-rolled immutable fakes in `fakes/`. Pure JVM, no Android framework.
+- **JVM data tests** at `app/src/test/java/com/example/reclaim/data/` — Robolectric-backed adapter tests covering `PackageManagerAppCatalog`, `UsageStatsManagerStats`, and `DataStoreAddedAppsRepository`.
+- **Compose UI tests** at `app/src/androidTest/java/com/example/reclaim/ui/screen/` — 23 tests across `AddAppSheetTest` (10), `EditAppSheetTest` (6), and `HomeScreenTest` (7). Mutable in-memory fakes in `fakes/` (separate from the JVM ones because `androidTest` and `test` source sets don't share code).
 
 The default `ExampleUnitTest` and `ExampleInstrumentedTest` scaffolding files are still there — they validate the toolchain. Don't delete them.
 
@@ -27,7 +28,7 @@ The default `ExampleUnitTest` and `ExampleInstrumentedTest` scaffolding files ar
 
 - **Unit tests** (no Android framework): `app/src/test/java/com/example/reclaim/...`. Mirror the `main` package structure.
 - **Compose UI tests**: `app/src/androidTest/java/com/example/reclaim/...` using `createAndroidComposeRule<ComponentActivity>()`. Wrap the subject under `ReclaimTheme { ... }` so colors resolve.
-- **Robolectric tests** (when fatia C lands): `app/src/test/java/com/example/reclaim/data/...`. Robolectric stays out of `domain/` — those tests are pure JVM.
+- **Robolectric tests** for data adapters: `app/src/test/java/com/example/reclaim/data/...`. Robolectric stays out of `domain/` — those tests are pure JVM.
 
 ## Domain test conventions
 

@@ -10,48 +10,33 @@ The `data/` package holds adapters that implement the interfaces declared in `do
 
 ## Current state
 
-- `DemoAppCatalog` — static list of 10 popular apps (Instagram, WhatsApp, TikTok, etc.). Bootstrap so the modal renders before fatia C arrives.
-- `DemoUsageStats` — static avg-usage map matching the demo catalog. Same role.
-- `InMemoryAddedAppsRepository` — process-lifetime store backed by a `mutableListOf<AddedApp>`. Lost on app restart.
+- `PackageManagerAppCatalog(packageManager, ownPackageName)` — queries `Intent.ACTION_MAIN` + `CATEGORY_LAUNCHER`, excludes Reclaim's own package, caches the result with an `invalidate()` hook.
+- `UsageStatsManagerStats(usageStatsManager, appOpsManager, packageName)` — `queryUsageStats(INTERVAL_DAILY, ...)` for both the 7-day average and today (since 00:00 local). Returns `emptyMap()` when usage access is denied. Exposes `hasUsageAccess()` for callers that need to gate UI.
+- `DataStoreAddedAppsRepository(dataStore: DataStore<Preferences>)` — persists `AddedApp` entries via Jetpack DataStore Preferences. Idempotent `add()` by `packageName`; `delete()` by `packageName`.
 
-All three are `object` singletons. No DI framework yet, so the NavHost and the screens reach them by name.
+All three are constructed once per process in `ReclaimApplication` as `by lazy` properties. No DI framework, no singletons.
 
 ## Shape of an adapter
 
-Match the domain interface's contract exactly. No additional public methods.
+Match the domain interface's contract exactly. No additional public methods unless the call site needs framework-specific affordances (`hasUsageAccess()` on `UsageStatsManagerStats`, `invalidate()` on `PackageManagerAppCatalog`).
 
-```kotlin
-object InMemoryAddedAppsRepository : AddedAppsRepository {
-    private val apps = mutableListOf<AddedApp>()
-
-    override fun addedApps(): List<AddedApp> = apps.toList()
-
-    override fun add(addedApp: AddedApp) {
-        apps.removeAll { it.packageName == addedApp.packageName }
-        apps.add(addedApp)
-    }
-}
-```
-
-`addedApps()` returns a defensive copy. `add()` is **idempotent by `packageName`** — calling it twice with the same package replaces the entry, never accumulates.
+`addedApps()` returns a defensive copy. `add()` is **idempotent by `packageName`** — calling it twice with the same package replaces the entry, never accumulates. `delete()` is also idempotent: deleting an absent package is a no-op.
 
 ## Filters that depend on real-world knowledge
 
-The "exclude Reclaim's own package" rule does **not** belong in the domain. When fatia C introduces `PackageManagerAppCatalog`, that adapter filters `com.example.reclaim` at the source. Same for "exclude system apps without a launcher icon" — the data adapter classifies; the domain reads.
+The "exclude Reclaim's own package" rule lives in `PackageManagerAppCatalog`, **not** the domain. Same for "exclude apps without a launcher activity." The data adapter classifies; the domain reads.
 
-## Replacement plan (fatia C)
+## Caching
 
-| Today (fatia B) | Fatia C |
-|---|---|
-| `DemoAppCatalog` | `PackageManagerAppCatalog` (queries `Intent.ACTION_MAIN` + `CATEGORY_LAUNCHER`) |
-| `DemoUsageStats` | `UsageStatsManagerStats` (`UsageStatsManager.queryUsageStats(INTERVAL_DAILY)` over last 7 days) |
-| `InMemoryAddedAppsRepository` | `DataStoreAddedAppsRepository` (Jetpack DataStore Preferences) |
+`PackageManagerAppCatalog` caches `installedApps()` to avoid hitting `PackageManager` on every recomposition. The cache is invalidated explicitly via `invalidate()` — `ReclaimNavHost` calls it from the AddApp modal's `OnResume` so the user picks up newly-installed apps without a relaunch. Any future cache (e.g. wrapping `UsageStatsManagerStats`) needs the same explicit invalidation story tied to a real lifecycle event.
 
-When the swap happens, the `Demo*` files go away. `InMemoryAddedAppsRepository` stays only if it's useful for testing or previews; otherwise delete it too.
+## Tests
+
+Adapter tests live at `app/src/test/java/com/example/reclaim/data/` and use Robolectric. Domain fakes (`FakeAppCatalog`, `FakeUsageStats`, `FakeAddedAppsRepository`) are not for adapter tests — they exist to drive use case tests in pure JVM.
 
 ## Anti-patterns
 
 - Adding domain logic to a data adapter. Sorting, top-N, "exclude already-added" — those live in the use cases. Adapters return raw data plus the structural filters that the framework dictates (launcher activity present, app op granted, etc.).
-- Coroutines that swallow errors. When fatia C introduces `suspend`, propagate failures so the use case (and its callers) decide what to do. No silent `try { ... } catch { emptyList() }`.
+- Coroutines that swallow errors. Propagate failures so the use case (and its callers) decide what to do. No silent `try { ... } catch { emptyList() }`. The exception is permission-denied paths where the contract is "return empty"; those are explicit, not catch-alls.
 - Importing `android.*` from domain code via the adapter. The adapter is one-way: it imports from `domain/`, never the reverse.
-- Caching reads inside an adapter without a clear invalidation story. `DemoAppCatalog` is fine because it's static. A future cache around `PackageManagerAppCatalog` needs to be invalidated when the user grants/revokes permissions or returns from Settings.
+- Caching reads inside an adapter without an invalidation story. `PackageManagerAppCatalog.invalidate()` is the precedent — wire any new cache to a lifecycle event the caller controls.
