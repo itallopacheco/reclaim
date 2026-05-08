@@ -65,10 +65,10 @@ internal fun HomeScreenContent(
     hasAddedApps: Boolean,
     onOpenUsageAccess: () -> Unit,
 ) {
-    val exceeded = todayScreenTime > dailyLimit
+    val exceeded = hasUsageAccess && todayScreenTime > dailyLimit
     Column {
         Text(
-            text = formatScreenTime(todayScreenTime),
+            text = if (hasUsageAccess) formatScreenTime(todayScreenTime) else "—",
             color = if (exceeded) ReclaimRed else ReclaimInk,
             modifier = Modifier.semantics {
                 contentDescription = if (exceeded) "Screen time today, exceeded" else "Screen time today"
@@ -78,6 +78,11 @@ internal fun HomeScreenContent(
             Text(text = "of your ${formatScreenTime(dailyLimit)} daily limit")
         } else {
             Text(text = "Add apps to set your daily limit")
+        }
+        if (!hasUsageAccess) {
+            TextButton(onClick = onOpenUsageAccess) {
+                Text(text = "Grant usage access")
+            }
         }
     }
 }

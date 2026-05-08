@@ -7,10 +7,13 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import com.example.reclaim.ui.theme.ReclaimTheme
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -70,6 +73,44 @@ class HomeScreenTest {
 
         composeRule.onNodeWithText("Add apps to set your daily limit").assertIsDisplayed()
         composeRule.onAllNodesWithText("of your 0h daily limit").assertCountEquals(0)
+    }
+
+    @Test
+    fun noUsageAccessShowsEmDashAndGrantButton() {
+        composeRule.setContent {
+            ReclaimTheme {
+                HomeScreenContent(
+                    todayScreenTime = Duration.ZERO,
+                    dailyLimit = 2.hours,
+                    hasUsageAccess = false,
+                    hasAddedApps = true,
+                    onOpenUsageAccess = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("—").assertIsDisplayed()
+        composeRule.onNodeWithText("Grant usage access").assertIsDisplayed()
+    }
+
+    @Test
+    fun tappingGrantUsageAccessFiresCallback() {
+        var fired = false
+        composeRule.setContent {
+            ReclaimTheme {
+                HomeScreenContent(
+                    todayScreenTime = Duration.ZERO,
+                    dailyLimit = 2.hours,
+                    hasUsageAccess = false,
+                    hasAddedApps = true,
+                    onOpenUsageAccess = { fired = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Grant usage access").performClick()
+
+        assertTrue(fired)
     }
 
     @Test
