@@ -18,6 +18,7 @@ import com.example.reclaim.ui.theme.ReclaimBg
 import com.example.reclaim.ui.theme.ReclaimInk
 import com.example.reclaim.ui.theme.ReclaimTeal
 import com.example.reclaim.ui.theme.ReclaimTheme
+import kotlin.time.Duration
 
 @Composable
 fun HomeScreen(onSeeAllApps: () -> Unit) {
@@ -43,6 +44,26 @@ fun HomeScreen(onSeeAllApps: () -> Unit) {
         TextButton(onClick = onSeeAllApps) {
             Text("See all apps →", color = ReclaimTeal, fontSize = 14.sp)
         }
+    }
+}
+
+private fun formatScreenTime(d: Duration): String {
+    val h = d.inWholeHours
+    val m = (d.inWholeMinutes % 60).toInt()
+    return if (m == 0) "${h}h" else "${h}h ${m}m"
+}
+
+@Composable
+internal fun HomeScreenContent(
+    todayScreenTime: Duration,
+    dailyLimit: Duration,
+    hasUsageAccess: Boolean,
+    hasAddedApps: Boolean,
+    onOpenUsageAccess: () -> Unit,
+) {
+    Column {
+        Text(text = formatScreenTime(todayScreenTime))
+        Text(text = "of your ${formatScreenTime(dailyLimit)} daily limit")
     }
 }
 
