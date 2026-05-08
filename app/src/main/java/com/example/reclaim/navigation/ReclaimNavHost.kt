@@ -166,7 +166,11 @@ fun ReclaimNavHost(
         composable(Destination.AddHabit.route) {
             AddHabitSheet(
                 onDismiss = { navController.popBackStack() },
-                onSave = { navController.popBackStack() }
+                onSave = { name, icon, reward ->
+                    val id = System.currentTimeMillis()
+                    app.habits.add(com.example.reclaim.domain.habits.Habit(id, name, icon, reward))
+                    navController.popBackStack()
+                },
             )
         }
 
