@@ -13,6 +13,7 @@ import com.example.reclaim.data.UsageStatsManagerStats
 import com.example.reclaim.domain.apps.AddedAppsRepository
 import com.example.reclaim.domain.apps.SearchAppsUseCase
 import com.example.reclaim.domain.apps.SuggestAppsUseCase
+import com.example.reclaim.domain.apps.TodayScreenTimeUseCase
 
 private val Context.addedAppsDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "added_apps",
@@ -41,6 +42,9 @@ class ReclaimApplication : Application() {
 
     val searchApps: SearchAppsUseCase
         get() = SearchAppsUseCase(catalog = appCatalog, addedApps = addedApps)
+
+    val todayScreenTime: TodayScreenTimeUseCase
+        get() = TodayScreenTimeUseCase(addedApps = addedApps, usageStats = usageStats)
 }
 
 fun Context.reclaimApplication(): ReclaimApplication =

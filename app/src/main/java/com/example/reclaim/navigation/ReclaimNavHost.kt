@@ -5,6 +5,10 @@ import android.provider.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -66,13 +70,19 @@ fun ReclaimNavHost(
 
         // ---------- Main app (tab destinations) ----------
         composable(Destination.Home.route) {
+            var refreshTick by remember { mutableIntStateOf(0) }
+            OnResume { refreshTick++ }
             MainScaffold(
                 navController = navController,
                 currentTab = TabDestination.Home,
                 onTabSelected = { navController.switchTab(it) }
             ) {
                 HomeScreen(
-                    onSeeAllApps = { navController.switchTab(TabDestination.Apps) }
+                    addedApps = app.addedApps,
+                    todayScreenTime = app.todayScreenTime,
+                    hasUsageAccess = { app.usageStats.hasUsageAccess() },
+                    onOpenUsageAccess = openUsageAccess,
+                    refreshTick = refreshTick,
                 )
             }
         }
