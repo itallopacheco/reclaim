@@ -55,15 +55,23 @@ interface AppCatalog {
 
 interface UsageStats {
     fun avgDailyUsageLast7Days(): Map<String, Duration>
+    fun usageToday(): Map<String, Duration>
 }
 
 interface AddedAppsRepository {
     fun addedApps(): List<AddedApp>
     fun add(addedApp: AddedApp)
+    fun delete(packageName: String)
 }
 ```
 
-`AddedAppsRepository` is the only interface with a write method. `add` is idempotent by `packageName` (replace, don't accumulate) — the contract belongs to implementations in `data/`, not the domain itself.
+`AddedAppsRepository` is the only interface with write methods. `add` is idempotent by `packageName` (replace, don't accumulate); `delete` is idempotent (deleting an absent package is a no-op). The contract belongs to implementations in `data/`, not the domain itself.
+
+Current use cases:
+
+- `SuggestAppsUseCase(catalog, usageStats, addedApps)` — top-N apps by avg daily usage, excluding already-added.
+- `SearchAppsUseCase(catalog, addedApps)` — substring search over installed apps, excluding already-added.
+- `TodayScreenTimeUseCase(addedApps, usageStats)` — sums `usageToday()` across the user's added packages. Drives the Home hero ring.
 
 ## What the domain does NOT decide
 
@@ -85,6 +93,7 @@ Tests mirror production:
 app/src/test/java/com/example/reclaim/domain/apps/
 ├── SuggestAppsUseCaseTest.kt
 ├── SearchAppsUseCaseTest.kt
+├── TodayScreenTimeUseCaseTest.kt
 └── fakes/
     ├── FakeAppCatalog.kt
     ├── FakeUsageStats.kt
