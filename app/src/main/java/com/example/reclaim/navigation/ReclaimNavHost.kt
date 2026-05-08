@@ -82,6 +82,8 @@ fun ReclaimNavHost(
                     addedApps = app.addedApps,
                     todayScreenTime = app.todayScreenTime,
                     rankAppsForHome = app.rankAppsForHome,
+                    habitsRepository = app.habits,
+                    habitsSummary = app.habitsTodaySummary,
                     hasUsageAccess = { app.usageStats.hasUsageAccess() },
                     onOpenUsageAccess = openUsageAccess,
                     onSeeAllApps = { navController.switchTab(TabDestination.Apps) },

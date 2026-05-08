@@ -344,7 +344,7 @@ private fun HabitsScreenEmptyPreview() {
         HabitsScreenContent(
             habits = emptyList(),
             completions = emptyMap(),
-            summary = HabitsTodaySummary(Duration.ZERO, 0, 0, Duration.ZERO),
+            summary = HabitsTodaySummary(Duration.ZERO, 0, 0, Duration.ZERO, null),
             onToggleComplete = {},
             onEditHabit = {},
         )
@@ -363,7 +363,13 @@ private fun HabitsScreenPopulatedPreview() {
                 Habit(4L, "Journal", HabitIcon.PEN_LINE, 10.minutes),
             ),
             completions = mapOf(3L to 7 * 60 + 24, 4L to 8 * 60 + 2),
-            summary = HabitsTodaySummary(25.minutes, 2, 4, 75.minutes),
+            summary = HabitsTodaySummary(
+                earned = 25.minutes,
+                completed = 2,
+                total = 4,
+                available = 75.minutes,
+                nextPending = Habit(1L, "Read 20 minutes", HabitIcon.BOOK_OPEN, 30.minutes),
+            ),
             onToggleComplete = {},
             onEditHabit = {},
         )

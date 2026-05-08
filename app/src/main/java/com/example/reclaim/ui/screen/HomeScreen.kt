@@ -22,11 +22,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,7 +53,12 @@ import com.example.reclaim.domain.apps.HomeAppRow
 import com.example.reclaim.domain.apps.HomeAppStatus
 import com.example.reclaim.domain.apps.RankAppsForHomeUseCase
 import com.example.reclaim.domain.apps.TodayScreenTimeUseCase
+import com.example.reclaim.domain.habits.Habit
+import com.example.reclaim.domain.habits.HabitsRepository
+import com.example.reclaim.domain.habits.HabitsTodaySummary
+import com.example.reclaim.domain.habits.HabitsTodaySummaryUseCase
 import com.example.reclaim.ui.theme.ReclaimAmber
+import com.example.reclaim.ui.theme.ReclaimAmberBg
 import com.example.reclaim.ui.theme.ReclaimBg
 import com.example.reclaim.ui.theme.ReclaimGreen
 import com.example.reclaim.ui.theme.ReclaimInk
@@ -57,6 +67,7 @@ import com.example.reclaim.ui.theme.ReclaimInk3
 import com.example.reclaim.ui.theme.ReclaimLine
 import com.example.reclaim.ui.theme.ReclaimRed
 import com.example.reclaim.ui.theme.ReclaimTeal
+import com.example.reclaim.ui.theme.ReclaimTeal2
 import com.example.reclaim.ui.theme.ReclaimTheme
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -68,17 +79,22 @@ fun HomeScreen(
     addedApps: AddedAppsRepository,
     todayScreenTime: TodayScreenTimeUseCase,
     rankAppsForHome: RankAppsForHomeUseCase,
+    habitsRepository: HabitsRepository,
+    habitsSummary: HabitsTodaySummaryUseCase,
     hasUsageAccess: () -> Boolean,
     onOpenUsageAccess: () -> Unit,
     onSeeAllApps: () -> Unit,
     refreshTick: Int = 0,
 ) {
+    var localTick by remember { mutableIntStateOf(0) }
     @Suppress("UNUSED_EXPRESSION") refreshTick
+    @Suppress("UNUSED_EXPRESSION") localTick
     val added = addedApps.addedApps()
     val limit = added.fold(Duration.ZERO) { acc, app -> acc + app.dailyQuota }
     val today = todayScreenTime.invoke()
     val accessGranted = hasUsageAccess()
     val rankedRows = if (accessGranted && added.isNotEmpty()) rankAppsForHome.invoke() else emptyList()
+    val summary = habitsSummary.invoke()
 
     HomeScreenContent(
         todayScreenTime = today,
@@ -88,7 +104,58 @@ fun HomeScreen(
         onOpenUsageAccess = onOpenUsageAccess,
         topApps = rankedRows,
         onSeeAllApps = onSeeAllApps,
+        habitsSummary = summary,
+        onMarkHabitComplete = { id ->
+            if (id !in habitsRepository.completionsToday().keys) {
+                habitsRepository.markCompleteToday(id, currentMinuteOfDay())
+                localTick++
+            }
+        },
     )
+}
+
+private fun currentMinuteOfDay(): Int {
+    val now = java.time.LocalTime.now()
+    return now.hour * 60 + now.minute
+}
+
+private val EMPTY_HABITS_SUMMARY = HabitsTodaySummary(
+    earned = Duration.ZERO,
+    completed = 0,
+    total = 0,
+    available = Duration.ZERO,
+    nextPending = null,
+)
+
+@Composable
+private fun EarnedPill(earned: Duration) {
+    Spacer(Modifier.height(16.dp))
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(999.dp))
+                .background(ReclaimTeal2)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.AutoAwesome,
+                contentDescription = null,
+                tint = ReclaimTeal,
+                modifier = Modifier.size(14.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = "+ ${earned.inWholeMinutes} min earned today",
+                color = ReclaimTeal,
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
 }
 
 private fun formatScreenTime(d: Duration): String {
@@ -111,6 +178,8 @@ internal fun HomeScreenContent(
     today: LocalDate = LocalDate.now(),
     topApps: List<HomeAppRow> = emptyList(),
     onSeeAllApps: () -> Unit = {},
+    habitsSummary: HabitsTodaySummary = EMPTY_HABITS_SUMMARY,
+    onMarkHabitComplete: (Long) -> Unit = {},
 ) {
     val exceeded = hasUsageAccess && todayScreenTime > dailyLimit
     val progress = when {
@@ -135,10 +204,109 @@ internal fun HomeScreenContent(
             emptyHint = if (!hasAddedApps) "Add apps to set your daily limit" else null,
             grantUsageAccess = if (!hasUsageAccess) onOpenUsageAccess else null,
         )
+        if (habitsSummary.earned > Duration.ZERO) {
+            EarnedPill(earned = habitsSummary.earned)
+        }
         if (topApps.isNotEmpty()) {
             TopAppsSection(rows = topApps, onSeeAllApps = onSeeAllApps)
         }
+        if (habitsSummary.total > 0) {
+            HabitsTodaySection(summary = habitsSummary, onMarkHabitComplete = onMarkHabitComplete)
+        }
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun HabitsTodaySection(summary: HabitsTodaySummary, onMarkHabitComplete: (Long) -> Unit) {
+    Column(modifier = Modifier.padding(top = 36.dp, start = 24.dp, end = 24.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Habits today",
+                color = ReclaimInk,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = "${summary.completed} / ${summary.total}",
+                color = ReclaimInk3,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+            )
+        }
+        if (summary.nextPending != null) {
+            Spacer(Modifier.height(12.dp))
+            PendingHabitCard(habit = summary.nextPending, onMarkComplete = onMarkHabitComplete)
+        } else {
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = "All habits done today. Nice work.",
+                color = ReclaimInk3,
+                fontSize = 13.sp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PendingHabitCard(habit: Habit, onMarkComplete: (Long) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(ReclaimBg)
+            .border(1.dp, ReclaimLine, RoundedCornerShape(14.dp))
+            .clickable { onMarkComplete(habit.id) }
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(ReclaimTeal2),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = habit.icon.name.first().toString(),
+                color = ReclaimTeal,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = habit.name,
+                color = ReclaimInk,
+                fontSize = 14.5.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = "Pending",
+                color = ReclaimInk3,
+                fontSize = 11.5.sp,
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(999.dp))
+                .background(ReclaimAmberBg)
+                .padding(horizontal = 10.dp, vertical = 4.dp),
+        ) {
+            Text(
+                text = "+${habit.reward.inWholeMinutes} min",
+                color = ReclaimAmber,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
     }
 }
 
