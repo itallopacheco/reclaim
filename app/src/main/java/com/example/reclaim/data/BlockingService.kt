@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import com.example.reclaim.R
 import com.example.reclaim.domain.apps.AddedApp
@@ -19,8 +20,11 @@ import com.example.reclaim.domain.apps.AppCatalog
 import com.example.reclaim.domain.apps.UsageStats
 import com.example.reclaim.domain.blocking.ForegroundAppMonitor
 import com.example.reclaim.domain.blocking.ShouldBlockAppUseCase
+import com.example.reclaim.domain.rewards.ApplyRewardSpendUseCase
 import com.example.reclaim.reclaimApplication
 import com.example.reclaim.ui.screen.BlockingActivity
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 class BlockingService : Service() {
@@ -31,7 +35,9 @@ class BlockingService : Service() {
     private lateinit var addedApps: AddedAppsRepository
     private lateinit var usageStats: UsageStats
     private lateinit var appCatalog: AppCatalog
+    private lateinit var applyRewardSpend: ApplyRewardSpendUseCase
     private var lastBlockedDispatched: String? = null
+    private var lastTickAtMillis: Long = -1L
 
     private val tick = object : Runnable {
         override fun run() {
@@ -53,6 +59,7 @@ class BlockingService : Service() {
         addedApps = app.addedApps
         usageStats = app.usageStats
         appCatalog = app.appCatalog
+        applyRewardSpend = app.applyRewardSpend
         startForegroundWithNotification()
         handler.post(tick)
     }
@@ -74,8 +81,11 @@ class BlockingService : Service() {
         val current = foregroundAppMonitor.currentForegroundPackage()
         if (current == null) {
             lastBlockedDispatched = null
+            lastTickAtMillis = -1L
             return
         }
+        // PRD ordering: (1) spend, (2) isBlocked, (3) overlay.
+        spendIfQuotaExhausted(current)
         if (current != lastBlockedDispatched) {
             lastBlockedDispatched = null
         }
@@ -90,6 +100,19 @@ class BlockingService : Service() {
         }
         dispatchOverlay(current)
         lastBlockedDispatched = current
+    }
+
+    private fun spendIfQuotaExhausted(packageName: String) {
+        val nowMillis = SystemClock.elapsedRealtime()
+        val previousMillis = lastTickAtMillis
+        lastTickAtMillis = nowMillis
+        if (previousMillis < 0L) return
+        val elapsed = (nowMillis - previousMillis).milliseconds
+        if (elapsed <= Duration.ZERO) return
+        val added = addedApps.addedApps().firstOrNull { it.packageName == packageName } ?: return
+        val today = usageStats.usageToday()[packageName] ?: Duration.ZERO
+        if (today < added.dailyQuota) return
+        applyRewardSpend.invoke(elapsed)
     }
 
     private fun dispatchOverlay(packageName: String) {
