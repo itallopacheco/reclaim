@@ -111,7 +111,11 @@ fun ReclaimNavHost(
                 onTabSelected = { navController.switchTab(it) },
                 onFabClick = { navController.navigate(Destination.AddHabit.route) }
             ) {
-                HabitsScreen()
+                HabitsScreen(
+                    habitsRepository = app.habits,
+                    summaryUseCase = app.habitsTodaySummary,
+                    onEditHabit = { /* wired later when EditHabit destination exists */ },
+                )
             }
         }
 

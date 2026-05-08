@@ -8,6 +8,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.reclaim.data.DataStoreAddedAppsRepository
+import com.example.reclaim.data.DataStoreHabitsRepository
 import com.example.reclaim.data.PackageManagerAppCatalog
 import com.example.reclaim.data.UsageStatsManagerStats
 import com.example.reclaim.domain.apps.AddedAppsRepository
@@ -15,9 +16,15 @@ import com.example.reclaim.domain.apps.RankAppsForHomeUseCase
 import com.example.reclaim.domain.apps.SearchAppsUseCase
 import com.example.reclaim.domain.apps.SuggestAppsUseCase
 import com.example.reclaim.domain.apps.TodayScreenTimeUseCase
+import com.example.reclaim.domain.habits.HabitsRepository
+import com.example.reclaim.domain.habits.HabitsTodaySummaryUseCase
 
 private val Context.addedAppsDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "added_apps",
+)
+
+private val Context.habitsDataStore: DataStore<Preferences> by preferencesDataStore(
+    name = "habits",
 )
 
 class ReclaimApplication : Application() {
@@ -49,6 +56,13 @@ class ReclaimApplication : Application() {
 
     val rankAppsForHome: RankAppsForHomeUseCase
         get() = RankAppsForHomeUseCase(addedApps = addedApps, usageStats = usageStats, catalog = appCatalog)
+
+    val habits: HabitsRepository by lazy {
+        DataStoreHabitsRepository(habitsDataStore)
+    }
+
+    val habitsTodaySummary: HabitsTodaySummaryUseCase
+        get() = HabitsTodaySummaryUseCase(habits = habits)
 }
 
 fun Context.reclaimApplication(): ReclaimApplication =
