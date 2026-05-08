@@ -49,8 +49,10 @@ import com.example.reclaim.domain.apps.HomeAppRow
 import com.example.reclaim.domain.apps.HomeAppStatus
 import com.example.reclaim.domain.apps.RankAppsForHomeUseCase
 import com.example.reclaim.domain.apps.TodayScreenTimeUseCase
+import com.example.reclaim.domain.habits.Habit
 import com.example.reclaim.domain.habits.HabitsTodaySummary
 import com.example.reclaim.ui.theme.ReclaimAmber
+import com.example.reclaim.ui.theme.ReclaimAmberBg
 import com.example.reclaim.ui.theme.ReclaimBg
 import com.example.reclaim.ui.theme.ReclaimGreen
 import com.example.reclaim.ui.theme.ReclaimInk
@@ -210,6 +212,67 @@ private fun HabitsTodaySection(summary: HabitsTodaySummary) {
                 color = ReclaimInk3,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
+            )
+        }
+        if (summary.nextPending != null) {
+            Spacer(Modifier.height(12.dp))
+            PendingHabitCard(habit = summary.nextPending)
+        }
+    }
+}
+
+@Composable
+private fun PendingHabitCard(habit: Habit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(ReclaimBg)
+            .border(1.dp, ReclaimLine, RoundedCornerShape(14.dp))
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(ReclaimTeal2),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = habit.icon.name.first().toString(),
+                color = ReclaimTeal,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = habit.name,
+                color = ReclaimInk,
+                fontSize = 14.5.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = "Pending",
+                color = ReclaimInk3,
+                fontSize = 11.5.sp,
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(999.dp))
+                .background(ReclaimAmberBg)
+                .padding(horizontal = 10.dp, vertical = 4.dp),
+        ) {
+            Text(
+                text = "+${habit.reward.inWholeMinutes} min",
+                color = ReclaimAmber,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
             )
         }
     }
