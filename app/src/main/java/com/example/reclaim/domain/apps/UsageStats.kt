@@ -4,4 +4,5 @@ import kotlin.time.Duration
 
 interface UsageStats {
     fun avgDailyUsageLast7Days(): Map<String, Duration>
+    fun usageToday(): Map<String, Duration>
 }
