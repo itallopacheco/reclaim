@@ -37,4 +37,26 @@ class RankAppsForHomeUseCaseTest {
             result,
         )
     }
+
+    @Test
+    fun `breaks usage ties by display name ascending`() {
+        val tiktok = App("com.zhiliaoapp.musically", "TikTok", isLauncherApp = true)
+        val instagram = App("com.instagram.android", "Instagram", isLauncherApp = true)
+        val repo = FakeAddedAppsRepository().apply {
+            add(AddedApp("com.zhiliaoapp.musically", 2.hours))
+            add(AddedApp("com.instagram.android", 2.hours))
+        }
+        val usage = FakeUsageStats(
+            avgs = emptyMap(),
+            today = mapOf(
+                "com.zhiliaoapp.musically" to 30.minutes,
+                "com.instagram.android" to 30.minutes,
+            ),
+        )
+        val catalog = FakeAppCatalog(listOf(tiktok, instagram))
+
+        val result = RankAppsForHomeUseCase(repo, usage, catalog).invoke()
+
+        assertEquals(listOf("Instagram", "TikTok"), result.map { it.app.displayName })
+    }
 }

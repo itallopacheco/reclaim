@@ -16,7 +16,7 @@ class RankAppsForHomeUseCase(
                 val today = usageMap.getValue(addedApp.packageName)
                 HomeAppRow(app, today, addedApp.dailyQuota, status(today, addedApp.dailyQuota))
             }
-            .sortedByDescending { it.today }
+            .sortedWith(compareByDescending<HomeAppRow> { it.today }.thenBy { it.app.displayName })
     }
 
     private fun status(today: Duration, quota: Duration): HomeAppStatus = when {
