@@ -10,12 +10,15 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.reclaim.ui.theme.ReclaimBg
 import com.example.reclaim.ui.theme.ReclaimInk
+import com.example.reclaim.ui.theme.ReclaimRed
 import com.example.reclaim.ui.theme.ReclaimTeal
 import com.example.reclaim.ui.theme.ReclaimTheme
 import kotlin.time.Duration
@@ -61,8 +64,15 @@ internal fun HomeScreenContent(
     hasAddedApps: Boolean,
     onOpenUsageAccess: () -> Unit,
 ) {
+    val exceeded = todayScreenTime > dailyLimit
     Column {
-        Text(text = formatScreenTime(todayScreenTime))
+        Text(
+            text = formatScreenTime(todayScreenTime),
+            color = if (exceeded) ReclaimRed else ReclaimInk,
+            modifier = Modifier.semantics {
+                contentDescription = if (exceeded) "Screen time today, exceeded" else "Screen time today"
+            },
+        )
         Text(text = "of your ${formatScreenTime(dailyLimit)} daily limit")
     }
 }

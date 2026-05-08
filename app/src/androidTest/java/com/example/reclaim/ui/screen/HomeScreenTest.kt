@@ -3,6 +3,7 @@ package com.example.reclaim.ui.screen
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import com.example.reclaim.ui.theme.ReclaimTheme
 import kotlin.time.Duration.Companion.hours
@@ -31,5 +32,22 @@ class HomeScreenTest {
 
         composeRule.onNodeWithText("1h 30m").assertIsDisplayed()
         composeRule.onNodeWithText("of your 3h daily limit").assertIsDisplayed()
+    }
+
+    @Test
+    fun screenTimeNumberIsMarkedExceededWhenOverLimit() {
+        composeRule.setContent {
+            ReclaimTheme {
+                HomeScreenContent(
+                    todayScreenTime = 2.hours + 14.minutes,
+                    dailyLimit = 2.hours,
+                    hasUsageAccess = true,
+                    hasAddedApps = true,
+                    onOpenUsageAccess = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Screen time today, exceeded").assertIsDisplayed()
     }
 }
