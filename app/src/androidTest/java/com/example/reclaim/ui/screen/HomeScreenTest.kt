@@ -226,6 +226,30 @@ class HomeScreenTest {
     }
 
     @Test
+    fun habitsSectionShowsAllDoneLineWhenEveryHabitCompleted() {
+        composeRule.setContent {
+            ReclaimTheme {
+                HomeScreenContent(
+                    todayScreenTime = 1.hours,
+                    dailyLimit = 2.hours,
+                    hasUsageAccess = true,
+                    hasAddedApps = true,
+                    onOpenUsageAccess = {},
+                    habitsSummary = HabitsTodaySummary(
+                        earned = 75.minutes,
+                        completed = 2,
+                        total = 2,
+                        available = Duration.ZERO,
+                        nextPending = null,
+                    ),
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("All habits done today. Nice work.").assertIsDisplayed()
+    }
+
+    @Test
     fun tappingPendingHabitCardFiresOnMarkComplete() {
         var firedId: Long? = null
         composeRule.setContent {

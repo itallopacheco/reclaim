@@ -218,6 +218,13 @@ private fun HabitsTodaySection(summary: HabitsTodaySummary, onMarkHabitComplete:
         if (summary.nextPending != null) {
             Spacer(Modifier.height(12.dp))
             PendingHabitCard(habit = summary.nextPending, onMarkComplete = onMarkHabitComplete)
+        } else {
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = "All habits done today. Nice work.",
+                color = ReclaimInk3,
+                fontSize = 13.sp,
+            )
         }
     }
 }
