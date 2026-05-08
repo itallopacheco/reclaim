@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -32,23 +33,24 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.reclaim.domain.habits.Habit
 import com.example.reclaim.domain.habits.HabitIcon
 import com.example.reclaim.ui.theme.ReclaimBg
 import com.example.reclaim.ui.theme.ReclaimInk
+import com.example.reclaim.ui.theme.ReclaimInk2
 import com.example.reclaim.ui.theme.ReclaimInk3
 import com.example.reclaim.ui.theme.ReclaimLine
+import com.example.reclaim.ui.theme.ReclaimRed
 import com.example.reclaim.ui.theme.ReclaimTeal
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.minutes
-
-internal val REWARD_CHIPS: List<Duration> =
-    listOf(5.minutes, 10.minutes, 15.minutes, 30.minutes, 45.minutes)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddHabitSheet(
+fun EditHabitSheet(
+    habit: Habit,
     onDismiss: () -> Unit,
     onSave: (name: String, icon: HabitIcon, reward: Duration) -> Unit,
+    onRequestRemove: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
@@ -57,18 +59,26 @@ fun AddHabitSheet(
         containerColor = ReclaimBg,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
     ) {
-        AddHabitSheetContent(onDismiss = onDismiss, onSave = onSave)
+        EditHabitSheetContent(
+            habit = habit,
+            onDismiss = onDismiss,
+            onSave = onSave,
+            onRequestRemove = onRequestRemove,
+        )
     }
 }
 
 @Composable
-internal fun AddHabitSheetContent(
+internal fun EditHabitSheetContent(
+    habit: Habit,
     onDismiss: () -> Unit,
     onSave: (name: String, icon: HabitIcon, reward: Duration) -> Unit,
+    onRequestRemove: () -> Unit,
 ) {
-    var name by remember { mutableStateOf("") }
-    var icon by remember { mutableStateOf(HabitIcon.BOOK_OPEN) }
-    var reward by remember { mutableStateOf(15.minutes) }
+    var name by remember { mutableStateOf(habit.name) }
+    var icon by remember { mutableStateOf(habit.icon) }
+    var reward by remember { mutableStateOf(habit.reward) }
+    var showRemoveDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -84,7 +94,7 @@ internal fun AddHabitSheetContent(
         ) {
             TextButton(onClick = onDismiss) { Text("Cancel", color = ReclaimInk3) }
             Spacer(Modifier.weight(1f))
-            Text("New habit", color = ReclaimInk, fontWeight = FontWeight.SemiBold)
+            Text("Edit habit", color = ReclaimInk, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.weight(1f))
             TextButton(
                 onClick = { onSave(name.trim(), icon, reward) },
@@ -117,34 +127,74 @@ internal fun AddHabitSheetContent(
         Spacer(Modifier.height(20.dp))
         Text(text = "ICON", color = ReclaimInk3, fontSize = 12.5.sp)
         Spacer(Modifier.height(8.dp))
-        IconPicker(selected = icon, onSelected = { icon = it })
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            HabitIcon.values().take(5).forEach { entry ->
+                EditIconTile(entry, icon == entry) { icon = entry }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            HabitIcon.values().drop(5).forEach { entry ->
+                EditIconTile(entry, icon == entry) { icon = entry }
+            }
+        }
 
         Spacer(Modifier.height(20.dp))
         Text(text = "TIME REWARD", color = ReclaimInk3, fontSize = 12.5.sp)
         Spacer(Modifier.height(8.dp))
-        RewardChips(selected = reward, onSelected = { reward = it })
-        Spacer(Modifier.height(8.dp))
-        Text(text = "minutes earned per completion", color = ReclaimInk3, fontSize = 11.5.sp)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            REWARD_CHIPS.forEach { d ->
+                val label = d.inWholeMinutes.toString()
+                Box(
+                    modifier = Modifier
+                        .height(40.dp)
+                        .border(
+                            width = if (reward == d) 2.dp else 1.dp,
+                            color = if (reward == d) ReclaimTeal else ReclaimLine,
+                            shape = RoundedCornerShape(10.dp),
+                        )
+                        .clickable { reward = d }
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(text = label, color = ReclaimInk, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
+        TextButton(onClick = { showRemoveDialog = true }) {
+            Text("Remove habit", color = ReclaimRed, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        }
+    }
+
+    if (showRemoveDialog) {
+        AlertDialog(
+            onDismissRequest = { showRemoveDialog = false },
+            title = { Text("Remove ${habit.name}?") },
+            confirmButton = {
+                TextButton(
+                    onClick = { showRemoveDialog = false; onRequestRemove() },
+                    modifier = Modifier.semantics { contentDescription = "Confirm remove habit" },
+                ) {
+                    Text("Remove", color = ReclaimRed, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showRemoveDialog = false },
+                    modifier = Modifier.semantics { contentDescription = "Cancel remove habit" },
+                ) {
+                    Text("Cancel", color = ReclaimInk2)
+                }
+            },
+            containerColor = ReclaimBg,
+        )
     }
 }
 
 @Composable
-private fun IconPicker(selected: HabitIcon, onSelected: (HabitIcon) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        HabitIcon.values().take(5).forEach { entry ->
-            IconTile(entry, selected == entry) { onSelected(entry) }
-        }
-    }
-    Spacer(Modifier.height(8.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        HabitIcon.values().drop(5).forEach { entry ->
-            IconTile(entry, selected == entry) { onSelected(entry) }
-        }
-    }
-}
-
-@Composable
-private fun IconTile(icon: HabitIcon, isSelected: Boolean, onClick: () -> Unit) {
+private fun EditIconTile(icon: HabitIcon, isSelected: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .size(56.dp)
@@ -153,33 +203,11 @@ private fun IconTile(icon: HabitIcon, isSelected: Boolean, onClick: () -> Unit) 
                 color = if (isSelected) ReclaimTeal else ReclaimLine,
                 shape = RoundedCornerShape(12.dp),
             )
+            .background(ReclaimBg, RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
             .semantics { contentDescription = "Icon ${icon.name}" },
         contentAlignment = Alignment.Center,
     ) {
         Text(text = icon.name.first().toString(), fontSize = 14.sp, color = ReclaimInk)
-    }
-}
-
-@Composable
-private fun RewardChips(selected: Duration, onSelected: (Duration) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        REWARD_CHIPS.forEach { d ->
-            val label = d.inWholeMinutes.toString()
-            Box(
-                modifier = Modifier
-                    .height(40.dp)
-                    .border(
-                        width = if (selected == d) 2.dp else 1.dp,
-                        color = if (selected == d) ReclaimTeal else ReclaimLine,
-                        shape = RoundedCornerShape(10.dp),
-                    )
-                    .clickable { onSelected(d) }
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(text = label, color = ReclaimInk, fontWeight = FontWeight.SemiBold)
-            }
-        }
     }
 }

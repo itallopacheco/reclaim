@@ -16,6 +16,10 @@ sealed class Destination(val route: String) {
         const val ARG_PACKAGE_NAME = "packageName"
         fun routeFor(packageName: String) = "modal/edit-app/$packageName"
     }
+    data object EditHabit : Destination("modal/edit-habit/{id}") {
+        const val ARG_ID = "id"
+        fun routeFor(id: Long) = "modal/edit-habit/$id"
+    }
 
     // Lock screen, opened from app list
     data object Lock : Destination("lock")
