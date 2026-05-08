@@ -11,7 +11,6 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
-import android.provider.Settings
 import android.util.Log
 import com.example.reclaim.R
 import com.example.reclaim.domain.apps.AddedApp
@@ -85,7 +84,7 @@ class BlockingService : Service() {
             return
         }
         if (current == lastBlockedDispatched) return
-        if (!Settings.canDrawOverlays(this)) {
+        if (!Permissions.canDrawOverlays(this)) {
             Log.i(TAG, "skipping overlay: SYSTEM_ALERT_WINDOW not granted")
             return
         }
