@@ -16,6 +16,7 @@ import com.example.reclaim.domain.apps.RankAppsForHomeUseCase
 import com.example.reclaim.domain.apps.SearchAppsUseCase
 import com.example.reclaim.domain.apps.SuggestAppsUseCase
 import com.example.reclaim.domain.apps.TodayScreenTimeUseCase
+import com.example.reclaim.domain.blocking.ShouldBlockAppUseCase
 import com.example.reclaim.domain.habits.HabitsRepository
 import com.example.reclaim.domain.habits.HabitsTodaySummaryUseCase
 
@@ -56,6 +57,9 @@ class ReclaimApplication : Application() {
 
     val rankAppsForHome: RankAppsForHomeUseCase
         get() = RankAppsForHomeUseCase(addedApps = addedApps, usageStats = usageStats, catalog = appCatalog)
+
+    val shouldBlockApp: ShouldBlockAppUseCase
+        get() = ShouldBlockAppUseCase(addedApps = addedApps, usageStats = usageStats)
 
     val habits: HabitsRepository by lazy {
         DataStoreHabitsRepository(habitsDataStore)
