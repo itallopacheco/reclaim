@@ -6,15 +6,29 @@ paths:
 
 # Data layer
 
-The `data/` package holds adapters that implement the interfaces declared in `domain/apps/`. This is where Android framework code (`PackageManager`, `UsageStatsManager`, DataStore) belongs. The domain stays free of `android.*` imports; the data layer earns the right to import them.
+The `data/` package holds adapters that implement interfaces declared anywhere under `domain/` (`apps/`, `blocking/`, `habits/`). This is where Android framework code (`PackageManager`, `UsageStatsManager`, DataStore, foreground services, broadcast receivers) belongs. The domain stays free of `android.*` imports; the data layer earns the right to import them.
 
 ## Current state
 
+**Read-only adapters**
+
 - `PackageManagerAppCatalog(packageManager, ownPackageName)` — queries `Intent.ACTION_MAIN` + `CATEGORY_LAUNCHER`, excludes Reclaim's own package, caches the result with an `invalidate()` hook.
 - `UsageStatsManagerStats(usageStatsManager, appOpsManager, packageName)` — `queryUsageStats(INTERVAL_DAILY, ...)` for both the 7-day average and today (since 00:00 local). Returns `emptyMap()` when usage access is denied. Exposes `hasUsageAccess()` for callers that need to gate UI.
-- `DataStoreAddedAppsRepository(dataStore: DataStore<Preferences>)` — persists `AddedApp` entries via Jetpack DataStore Preferences. Idempotent `add()` by `packageName`; `delete()` by `packageName`.
+- `UsageEventsForegroundAppMonitor(usageStatsManager)` — implements `ForegroundAppMonitor`. Calls `queryEvents(now - 10s, now)` and returns the package of the latest `ACTIVITY_RESUMED` event, or `null`. The 10-second lookback is a `private companion object` constant; raise it only if a test demands it.
 
-All three are constructed once per process in `ReclaimApplication` as `by lazy` properties. No DI framework, no singletons.
+**Write-bearing adapters**
+
+- `DataStoreAddedAppsRepository(dataStore)` — persists `AddedApp` entries. `add` is idempotent by `packageName`, `delete` is a no-op for absent packages.
+- `DataStoreHabitsRepository(dataStore)` — persists habits and per-day completion counts. Same idempotency contract; `markCompleteToday` increments, `unmarkToday` clears.
+
+**Blocking runtime**
+
+- `BlockingService` — foreground service (`FOREGROUND_SERVICE_TYPE_SPECIAL_USE`). Polls `foregroundAppMonitor.currentForegroundPackage()` every `POLL_INTERVAL = 1.seconds` via `Handler(Looper.getMainLooper()).postDelayed(...)` and dispatches `BlockingActivity` once per blocked package (deduped by `lastBlockedDispatched`). Skips dispatch if `Permissions.canDrawOverlays()` is false. Calls `stopSelf()` when no apps are added. `companion object` exposes `start(ctx)` / `stop(ctx)` — those are the only entry points; never `Intent`-construct the service from elsewhere.
+- `BlockingServiceController` — the orchestrator that decides when to call `BlockingService.start/stop`.
+- `BootCompletedReceiver` — re-arms `BlockingService` after `BOOT_COMPLETED`.
+- `Permissions` — pure helpers: `hasUsageAccess(context)`, `canDrawOverlays(context)`. No DI; called directly where needed.
+
+All adapters are constructed once per process in `ReclaimApplication` as `by lazy` properties. No DI framework, no singletons.
 
 ## Shape of an adapter
 
@@ -30,9 +44,13 @@ The "exclude Reclaim's own package" rule lives in `PackageManagerAppCatalog`, **
 
 `PackageManagerAppCatalog` caches `installedApps()` to avoid hitting `PackageManager` on every recomposition. The cache is invalidated explicitly via `invalidate()` — `ReclaimNavHost` calls it from the AddApp modal's `OnResume` so the user picks up newly-installed apps without a relaunch. Any future cache (e.g. wrapping `UsageStatsManagerStats`) needs the same explicit invalidation story tied to a real lifecycle event.
 
+## Polling and threading
+
+`BlockingService` runs its tick on the main looper. The work each tick does is cheap (a DataStore-backed list read and a synchronous `queryEvents` call), so a `Handler` schedule is enough — don't reach for coroutines or a worker thread without a measurement that says you need them. Wrap the tick in `try/finally` so `postDelayed` always re-arms even if the call throws (precedent: `BlockingService.tick`).
+
 ## Tests
 
-Adapter tests live at `app/src/test/java/com/example/reclaim/data/` and use Robolectric. Domain fakes (`FakeAppCatalog`, `FakeUsageStats`, `FakeAddedAppsRepository`) are not for adapter tests — they exist to drive use case tests in pure JVM.
+Adapter tests live at `app/src/test/java/com/example/reclaim/data/` and use Robolectric. Domain fakes (`FakeAppCatalog`, `FakeUsageStats`, `FakeAddedAppsRepository`, `FakeBlockingDecision`, `FakeHabitsRepository`) are not for adapter tests — they exist to drive use case tests in pure JVM.
 
 ## Anti-patterns
 

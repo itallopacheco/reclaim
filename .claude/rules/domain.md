@@ -35,9 +35,18 @@ class SuggestAppsUseCase(
 Current entities:
 
 ```kotlin
+// apps
 data class App(val packageName: String, val displayName: String, val isLauncherApp: Boolean)
 data class SuggestedApp(val app: App, val avgDaily: Duration)
 data class AddedApp(val packageName: String, val dailyQuota: Duration)
+data class HomeAppRow(val app: App, val today: Duration, val quota: Duration,
+                      val status: HomeAppStatus, val isBlockingNow: Boolean = false)
+enum class HomeAppStatus { OK, WARN, OVER }
+
+// habits
+data class Habit(val id: Long, val name: String, val icon: HabitIcon, val reward: Duration)
+data class HabitsTodaySummary(val pending: List<Habit>, val completed: List<Habit>,
+                              val totalReward: Duration)
 ```
 
 ## Interfaces
@@ -49,9 +58,8 @@ data class AddedApp(val packageName: String, val dailyQuota: Duration)
 Current interfaces:
 
 ```kotlin
-interface AppCatalog {
-    fun installedApps(): List<App>
-}
+// apps
+interface AppCatalog { fun installedApps(): List<App> }
 
 interface UsageStats {
     fun avgDailyUsageLast7Days(): Map<String, Duration>
@@ -63,15 +71,31 @@ interface AddedAppsRepository {
     fun add(addedApp: AddedApp)
     fun delete(packageName: String)
 }
+
+// blocking
+interface BlockingDecision { fun isBlocked(packageName: String): Boolean }
+interface ForegroundAppMonitor { fun currentForegroundPackage(): String? }
+
+// habits
+interface HabitsRepository {
+    fun habits(): List<Habit>
+    fun add(habit: Habit); fun update(habit: Habit); fun delete(id: Long)
+    fun completionsToday(): Map<Long, Int>
+    fun markCompleteToday(id: Long, atMinuteOfDay: Int)
+    fun unmarkToday(id: Long)
+}
 ```
 
-`AddedAppsRepository` is the only interface with write methods. `add` is idempotent by `packageName` (replace, don't accumulate); `delete` is idempotent (deleting an absent package is a no-op). The contract belongs to implementations in `data/`, not the domain itself.
+Write-bearing interfaces (`AddedAppsRepository`, `HabitsRepository`) are idempotent by primary key — `add` replaces a same-key entry, `delete`/`unmarkToday` on an absent key is a no-op. The contract belongs to implementations in `data/`, not the domain itself.
 
 Current use cases:
 
 - `SuggestAppsUseCase(catalog, usageStats, addedApps)` — top-N apps by avg daily usage, excluding already-added.
 - `SearchAppsUseCase(catalog, addedApps)` — substring search over installed apps, excluding already-added.
 - `TodayScreenTimeUseCase(addedApps, usageStats)` — sums `usageToday()` across the user's added packages. Drives the Home hero ring.
+- `RankAppsForHomeUseCase(addedApps, usageStats, catalog, blockingDecision)` — returns ranked `HomeAppRow`s for Home/Apps; computes `HomeAppStatus` (OK / WARN at ≥80% / OVER) and a separate `isBlockingNow` flag.
+- `ShouldBlockAppUseCase(addedApps, usageStats)` — *implements* `BlockingDecision`. A use case being its own interface implementation is intentional: the public `invoke()` is for screens that want imperative phrasing, and `isBlocked()` is what `RankAppsForHomeUseCase` and `BlockingService` consume through the abstraction.
+- `HabitsTodaySummaryUseCase(habits)` — partitions habits by today's completion count and folds rewards into `HabitsTodaySummary`.
 
 ## What the domain does NOT decide
 
@@ -90,14 +114,17 @@ Current use cases:
 Tests mirror production:
 
 ```
-app/src/test/java/com/example/reclaim/domain/apps/
-├── SuggestAppsUseCaseTest.kt
-├── SearchAppsUseCaseTest.kt
-├── TodayScreenTimeUseCaseTest.kt
-└── fakes/
-    ├── FakeAppCatalog.kt
-    ├── FakeUsageStats.kt
-    └── FakeAddedAppsRepository.kt
+app/src/test/java/com/example/reclaim/domain/
+├── apps/
+│   ├── SuggestAppsUseCaseTest.kt, SearchAppsUseCaseTest.kt
+│   ├── TodayScreenTimeUseCaseTest.kt, RankAppsForHomeUseCaseTest.kt
+│   └── fakes/  (FakeAppCatalog, FakeUsageStats, FakeAddedAppsRepository)
+├── blocking/
+│   ├── ShouldBlockAppUseCaseTest.kt
+│   └── fakes/  (FakeBlockingDecision)
+└── habits/
+    ├── HabitsTodaySummaryUseCaseTest.kt
+    └── fakes/  (FakeHabitsRepository)
 ```
 
 - One test class per use case, named `<UseCase>Test`.

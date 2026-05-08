@@ -52,25 +52,42 @@ app/src/main/java/com/example/reclaim/
 ├── navigation/
 │   ├── Destinations.kt          # sealed Destination(route) + TabDestination enum
 │   └── ReclaimNavHost.kt        # NavHost wiring; screens get callbacks, not NavController
-├── domain/
-│   └── apps/                    # pure-JVM domain layer for the "added apps" feature
-│       ├── App.kt, SuggestedApp.kt, AddedApp.kt
-│       ├── AppCatalog.kt, UsageStats.kt, AddedAppsRepository.kt   # interfaces
-│       ├── SuggestAppsUseCase.kt
-│       ├── SearchAppsUseCase.kt
-│       └── TodayScreenTimeUseCase.kt   # sums today's usage across added apps (Home hero ring)
+├── domain/                      # pure-JVM, no android.* imports
+│   ├── apps/                    # added-apps feature
+│   │   ├── App.kt, SuggestedApp.kt, AddedApp.kt, HomeAppRow.kt, HomeAppStatus.kt
+│   │   ├── AppCatalog.kt, UsageStats.kt, AddedAppsRepository.kt   # interfaces
+│   │   ├── SuggestAppsUseCase.kt, SearchAppsUseCase.kt
+│   │   ├── TodayScreenTimeUseCase.kt        # sums today's usage across added apps (Home hero ring)
+│   │   └── RankAppsForHomeUseCase.kt        # ranked HomeAppRow list, injects BlockingDecision for the badge
+│   ├── blocking/                # app-blocking feature
+│   │   ├── BlockingDecision.kt              # interface: isBlocked(packageName)
+│   │   ├── ForegroundAppMonitor.kt          # interface: currentForegroundPackage()
+│   │   └── ShouldBlockAppUseCase.kt         # implements BlockingDecision: today >= dailyQuota
+│   └── habits/
+│       ├── Habit.kt, HabitIcon.kt, HabitsTodaySummary.kt
+│       ├── HabitsRepository.kt              # CRUD + completionsToday()/markCompleteToday/unmarkToday
+│       └── HabitsTodaySummaryUseCase.kt
 ├── data/                        # adapters that implement the domain interfaces
-│   ├── PackageManagerAppCatalog.kt     # queries Intent.ACTION_MAIN + CATEGORY_LAUNCHER, excludes Reclaim
-│   ├── UsageStatsManagerStats.kt       # queryUsageStats(INTERVAL_DAILY) for 7-day avg + today
-│   └── DataStoreAddedAppsRepository.kt # persists AddedApp via Jetpack DataStore Preferences
+│   ├── PackageManagerAppCatalog.kt          # Intent.ACTION_MAIN + CATEGORY_LAUNCHER, excludes Reclaim
+│   ├── UsageStatsManagerStats.kt            # queryUsageStats(INTERVAL_DAILY) for 7-day avg + today
+│   ├── UsageEventsForegroundAppMonitor.kt   # queryEvents w/ 10s lookback, last ACTIVITY_RESUMED
+│   ├── DataStoreAddedAppsRepository.kt      # AddedApp persistence via DataStore Preferences
+│   ├── DataStoreHabitsRepository.kt         # Habits + per-day completion counts via DataStore
+│   ├── BlockingService.kt                   # foreground service, polls foreground app every 1s
+│   ├── BlockingServiceController.kt         # start/stop hooks for the service
+│   ├── BootCompletedReceiver.kt             # restarts BlockingService after reboot
+│   └── Permissions.kt                       # usage-access + canDrawOverlays helpers
 └── ui/
     ├── main/
     │   └── MainScaffold.kt      # tab bar host (Home / Apps / Habits) + FAB
     ├── screen/                  # one file per screen, public @Composable
     │   ├── OnboardingValueScreen.kt, OnboardingPermissionsScreen.kt
     │   ├── HomeScreen.kt, AppsScreen.kt, HabitsScreen.kt
-    │   ├── AddAppSheet.kt, EditAppSheet.kt, AddHabitSheet.kt   # ModalBottomSheet routes
-    │   └── LockScreen.kt        # full design translation, HabitsScreen still a stub
+    │   ├── AddAppSheet.kt, EditAppSheet.kt
+    │   ├── AddHabitSheet.kt, EditHabitSheet.kt
+    │   ├── BlockingActivity.kt, BlockedAppScreen.kt    # overlay shown when an app exceeds its quota
+    │   ├── BlockingNowBadge.kt                          # shared badge used on Home + Apps cards
+    │   └── LockScreen.kt
     └── theme/
         ├── Color.kt             # Reclaim* design tokens
         ├── Theme.kt             # ReclaimTheme, light-only, no dynamic color
@@ -85,11 +102,17 @@ Three loose layers. No DI framework yet, no ViewModels yet.
 
 - **`ui/`** — Compose screens and the tab scaffold. Screens are pure presentation: state via `remember`, navigation via callbacks. Screens consume domain interfaces directly (constructor parameters), no ViewModel layer.
 - **`domain/`** — pure Kotlin/JVM. Use cases (`class Foo(deps...) { fun invoke(...) }`) operating on data classes (`App`, `SuggestedApp`, `AddedApp`). Dependencies are interfaces (`AppCatalog`, `UsageStats`, `AddedAppsRepository`).
-- **`data/`** — adapters implementing the domain interfaces. Live adapters: `PackageManagerAppCatalog`, `UsageStatsManagerStats`, `DataStoreAddedAppsRepository`. Filters that depend on real-world knowledge (e.g. excluding Reclaim's own package) belong here, **not** in the domain.
+- **`data/`** — adapters implementing the domain interfaces (`PackageManagerAppCatalog`, `UsageStatsManagerStats`, `UsageEventsForegroundAppMonitor`, `DataStoreAddedAppsRepository`, `DataStoreHabitsRepository`). Filters that depend on real-world knowledge (e.g. excluding Reclaim's own package) belong here, **not** in the domain.
+
+### App blocking
+
+`BlockingService` is a foreground service started from `MainActivity`. Every second it asks `ForegroundAppMonitor.currentForegroundPackage()`, runs `ShouldBlockAppUseCase.invoke(pkg)`, and — if blocked and `Permissions.canDrawOverlays()` — launches `BlockingActivity` on top of the offending app. `BootCompletedReceiver` restarts the service after a reboot. The service stops itself when the user has no added apps left.
+
+`RankAppsForHomeUseCase` injects `BlockingDecision` so each `HomeAppRow` carries `isBlockingNow`, surfaced as `BlockingNowBadge` on Home and Apps cards.
 
 `ReclaimApplication` is the DI root — it owns the lazy adapter instances and exposes use cases as properties. Screens reach it via `context.reclaimApplication()` and receive the dependencies they need through `ReclaimNavHost`. No DI framework, no ViewModels.
 
-Domain code is tested in pure JVM with hand-rolled fakes in `app/src/test/.../domain/apps/fakes/`. Data adapters are tested with Robolectric in `app/src/test/.../data/`.
+Domain code is tested in pure JVM with hand-rolled fakes under `app/src/test/.../domain/<feature>/fakes/`. Data adapters are tested with Robolectric in `app/src/test/.../data/`.
 
 ## Conventions
 
@@ -115,27 +138,35 @@ Layout:
 
 ```
 app/src/test/java/com/example/reclaim/
-├── domain/apps/
-│   ├── SuggestAppsUseCaseTest.kt          # 6 tests
-│   ├── SearchAppsUseCaseTest.kt           # 4 tests
-│   ├── TodayScreenTimeUseCaseTest.kt      # 2 tests
-│   └── fakes/
-│       ├── FakeAppCatalog.kt
-│       ├── FakeUsageStats.kt
-│       └── FakeAddedAppsRepository.kt
+├── domain/
+│   ├── apps/
+│   │   ├── SuggestAppsUseCaseTest.kt
+│   │   ├── SearchAppsUseCaseTest.kt
+│   │   ├── TodayScreenTimeUseCaseTest.kt
+│   │   ├── RankAppsForHomeUseCaseTest.kt
+│   │   └── fakes/  (FakeAppCatalog, FakeUsageStats, FakeAddedAppsRepository)
+│   ├── blocking/
+│   │   ├── ShouldBlockAppUseCaseTest.kt
+│   │   └── fakes/  (FakeBlockingDecision)
+│   └── habits/
+│       ├── HabitsTodaySummaryUseCaseTest.kt
+│       └── fakes/  (FakeHabitsRepository)
 └── data/                                   # Robolectric-backed adapter tests
     ├── PackageManagerAppCatalogTest.kt
     ├── UsageStatsManagerStatsTest.kt
-    └── DataStoreAddedAppsRepositoryTest.kt
+    ├── UsageEventsForegroundAppMonitorTest.kt
+    ├── DataStoreAddedAppsRepositoryTest.kt
+    └── DataStoreHabitsRepositoryTest.kt
 
 app/src/androidTest/java/com/example/reclaim/ui/screen/
-├── AddAppSheetTest.kt                     # 10 Compose UI tests
-├── EditAppSheetTest.kt                    # 6 Compose UI tests
-├── HomeScreenTest.kt                      # 7 Compose UI tests
-└── fakes/                                 # in-memory mutable fakes for UI
-    ├── FakeAppCatalog.kt
-    ├── FakeUsageStats.kt
-    └── FakeAddedAppsRepository.kt
+├── AddAppSheetTest.kt, EditAppSheetTest.kt
+├── AddHabitSheetTest.kt, EditHabitSheetTest.kt
+├── HomeScreenTest.kt, AppsScreenTest.kt, HabitsScreenTest.kt
+├── BlockedAppScreenTest.kt
+├── OnboardingPermissionsScreenTest.kt
+└── fakes/                                 # mutable in-memory fakes for UI tests
+    ├── FakeAppCatalog.kt, FakeUsageStats.kt, FakeAddedAppsRepository.kt
+    └── FakeHabitsRepository.kt
 ```
 
 The default `ExampleUnitTest` and `ExampleInstrumentedTest` scaffolding are kept — they validate the toolchain.
