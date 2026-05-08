@@ -427,6 +427,10 @@ private fun TopAppRow(row: HomeAppRow) {
                     fontWeight = FontWeight.SemiBold,
                 )
             }
+            if (row.isBlockingNow) {
+                Spacer(Modifier.height(4.dp))
+                BlockingNowBadge()
+            }
             Spacer(Modifier.height(6.dp))
             Box(
                 modifier = Modifier

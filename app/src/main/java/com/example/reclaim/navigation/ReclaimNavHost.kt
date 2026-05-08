@@ -108,6 +108,7 @@ fun ReclaimNavHost(
                 AppsScreen(
                     addedApps = app.addedApps,
                     catalog = app.appCatalog,
+                    blockingDecision = app.shouldBlockApp,
                     onAppClick = { packageName ->
                         navController.navigate(Destination.EditApp.routeFor(packageName))
                     },

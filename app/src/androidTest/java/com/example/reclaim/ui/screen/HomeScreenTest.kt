@@ -467,6 +467,60 @@ class HomeScreenTest {
     }
 
     @Test
+    fun topAppsRowShowsBlockingNowBadgeWhenIsBlockingNow() {
+        val instagram = App("com.instagram.android", "Instagram", isLauncherApp = true)
+        composeRule.setContent {
+            ReclaimTheme {
+                HomeScreenContent(
+                    todayScreenTime = 30.minutes,
+                    dailyLimit = 30.minutes,
+                    hasUsageAccess = true,
+                    hasAddedApps = true,
+                    onOpenUsageAccess = {},
+                    topApps = listOf(
+                        HomeAppRow(
+                            app = instagram,
+                            today = 30.minutes,
+                            quota = 30.minutes,
+                            status = HomeAppStatus.OVER,
+                            isBlockingNow = true,
+                        ),
+                    ),
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Blocking now").assertIsDisplayed()
+    }
+
+    @Test
+    fun topAppsRowHidesBlockingNowBadgeWhenNotBlocking() {
+        val instagram = App("com.instagram.android", "Instagram", isLauncherApp = true)
+        composeRule.setContent {
+            ReclaimTheme {
+                HomeScreenContent(
+                    todayScreenTime = 25.minutes,
+                    dailyLimit = 30.minutes,
+                    hasUsageAccess = true,
+                    hasAddedApps = true,
+                    onOpenUsageAccess = {},
+                    topApps = listOf(
+                        HomeAppRow(
+                            app = instagram,
+                            today = 25.minutes,
+                            quota = 30.minutes,
+                            status = HomeAppStatus.WARN,
+                            isBlockingNow = false,
+                        ),
+                    ),
+                )
+            }
+        }
+
+        composeRule.onAllNodesWithText("Blocking now").assertCountEquals(0)
+    }
+
+    @Test
     fun tappingGrantInBannerInvokesOpenOverlaySettings() {
         var fired = false
         composeRule.setContent {

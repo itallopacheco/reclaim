@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.reclaim.domain.apps.AddedAppsRepository
 import com.example.reclaim.domain.apps.AppCatalog
+import com.example.reclaim.domain.blocking.BlockingDecision
 import com.example.reclaim.ui.theme.ReclaimBg
 import com.example.reclaim.ui.theme.ReclaimInk
 import com.example.reclaim.ui.theme.ReclaimInk3
@@ -33,16 +34,18 @@ import com.example.reclaim.ui.theme.ReclaimLine
 import com.example.reclaim.ui.theme.ReclaimTheme
 import kotlin.time.Duration
 
-private data class AppEntry(
+internal data class AppEntry(
     val packageName: String,
     val displayName: String,
     val quota: Duration,
+    val isBlockingNow: Boolean,
 )
 
 @Composable
 fun AppsScreen(
     addedApps: AddedAppsRepository,
     catalog: AppCatalog,
+    blockingDecision: BlockingDecision,
     onAppClick: (packageName: String) -> Unit,
 ) {
     val nameByPackage = catalog.installedApps().associate { it.packageName to it.displayName }
@@ -51,8 +54,17 @@ fun AppsScreen(
             packageName = it.packageName,
             displayName = nameByPackage[it.packageName] ?: it.packageName,
             quota = it.dailyQuota,
+            isBlockingNow = blockingDecision.isBlocked(it.packageName),
         )
     }
+    AppsScreenContent(entries = entries, onAppClick = onAppClick)
+}
+
+@Composable
+internal fun AppsScreenContent(
+    entries: List<AppEntry>,
+    onAppClick: (packageName: String) -> Unit,
+) {
 
     Column(
         modifier = Modifier
@@ -119,6 +131,10 @@ private fun AppRow(entry: AppEntry, onClick: () -> Unit) {
                 fontSize = 12.sp,
             )
         }
+        if (entry.isBlockingNow) {
+            Spacer(Modifier.size(12.dp))
+            BlockingNowBadge()
+        }
     }
 }
 
@@ -137,16 +153,6 @@ private fun formatQuota(quota: Duration): String {
 @Composable
 private fun AppsScreenPreview() {
     ReclaimTheme {
-        AppsScreen(
-            addedApps = object : AddedAppsRepository {
-                override fun addedApps() = emptyList<com.example.reclaim.domain.apps.AddedApp>()
-                override fun add(addedApp: com.example.reclaim.domain.apps.AddedApp) {}
-                override fun delete(packageName: String) {}
-            },
-            catalog = object : AppCatalog {
-                override fun installedApps() = emptyList<com.example.reclaim.domain.apps.App>()
-            },
-            onAppClick = {},
-        )
+        AppsScreenContent(entries = emptyList(), onAppClick = {})
     }
 }
