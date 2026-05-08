@@ -226,6 +226,30 @@ class HomeScreenTest {
     }
 
     @Test
+    fun habitsSectionHiddenWhenUserHasNoHabits() {
+        composeRule.setContent {
+            ReclaimTheme {
+                HomeScreenContent(
+                    todayScreenTime = 1.hours,
+                    dailyLimit = 2.hours,
+                    hasUsageAccess = true,
+                    hasAddedApps = true,
+                    onOpenUsageAccess = {},
+                    habitsSummary = HabitsTodaySummary(
+                        earned = Duration.ZERO,
+                        completed = 0,
+                        total = 0,
+                        available = Duration.ZERO,
+                        nextPending = null,
+                    ),
+                )
+            }
+        }
+
+        composeRule.onAllNodesWithText("Habits today").assertCountEquals(0)
+    }
+
+    @Test
     fun habitsSectionShowsAllDoneLineWhenEveryHabitCompleted() {
         composeRule.setContent {
             ReclaimTheme {
