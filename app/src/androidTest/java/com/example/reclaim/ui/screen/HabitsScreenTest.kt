@@ -24,6 +24,36 @@ class HabitsScreenTest {
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
+    fun listRendersPendingAndCompletedSectionsAndEarnedCard() {
+        val read = Habit(1L, "Read 20 minutes", HabitIcon.BOOK_OPEN, 30.minutes)
+        val workout = Habit(2L, "Workout", HabitIcon.DUMBBELL, 45.minutes)
+        val meditate = Habit(3L, "Morning meditation", HabitIcon.SUN, 15.minutes)
+        val journal = Habit(4L, "Journal", HabitIcon.PEN_LINE, 10.minutes)
+        composeRule.setContent {
+            ReclaimTheme {
+                HabitsScreenContent(
+                    habits = listOf(read, workout, meditate, journal),
+                    completions = mapOf(3L to 7 * 60 + 24, 4L to 8 * 60 + 2),
+                    summary = HabitsTodaySummary(25.minutes, 2, 4, 75.minutes),
+                    onToggleComplete = {},
+                    onEditHabit = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("EARNED TODAY").assertIsDisplayed()
+        composeRule.onNodeWithText("+25 min").assertIsDisplayed()
+        composeRule.onNodeWithText("2 of 4 done").assertIsDisplayed()
+        composeRule.onNodeWithText("+75 min available").assertIsDisplayed()
+        composeRule.onNodeWithText("Pending · 2").assertIsDisplayed()
+        composeRule.onNodeWithText("Completed · 2").assertIsDisplayed()
+        composeRule.onNodeWithText("Read 20 minutes").assertIsDisplayed()
+        composeRule.onNodeWithText("Workout").assertIsDisplayed()
+        composeRule.onNodeWithText("Morning meditation").assertIsDisplayed()
+        composeRule.onNodeWithText("Journal").assertIsDisplayed()
+    }
+
+    @Test
     fun emptyStateShowsCreateHintAndHidesEarnedCard() {
         composeRule.setContent {
             ReclaimTheme {

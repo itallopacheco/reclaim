@@ -66,8 +66,53 @@ internal fun HabitsScreenContent(
         )
         if (habits.isEmpty()) {
             Text(text = "Create your first habit to start earning time.")
+            return@Column
+        }
+        EarnedTodayCard(summary)
+        val (pending, done) = habits.partition { it.id !in completions.keys }
+        if (pending.isNotEmpty()) {
+            Text(text = "Pending · ${pending.size}")
+            pending.forEach { habit ->
+                HabitRow(
+                    habit = habit,
+                    completedAtMinute = null,
+                    onToggleComplete = onToggleComplete,
+                    onEditHabit = onEditHabit,
+                )
+            }
+        }
+        if (done.isNotEmpty()) {
+            Text(text = "Completed · ${done.size}")
+            done.forEach { habit ->
+                HabitRow(
+                    habit = habit,
+                    completedAtMinute = completions[habit.id],
+                    onToggleComplete = onToggleComplete,
+                    onEditHabit = onEditHabit,
+                )
+            }
         }
     }
+}
+
+@Composable
+private fun EarnedTodayCard(summary: HabitsTodaySummary) {
+    Column {
+        Text(text = "EARNED TODAY")
+        Text(text = "+${summary.earned.inWholeMinutes} min")
+        Text(text = "${summary.completed} of ${summary.total} done")
+        Text(text = "+${summary.available.inWholeMinutes} min available")
+    }
+}
+
+@Composable
+private fun HabitRow(
+    habit: Habit,
+    completedAtMinute: Int?,
+    onToggleComplete: (Long) -> Unit,
+    onEditHabit: (Long) -> Unit,
+) {
+    Text(text = habit.name)
 }
 
 private fun currentMinuteOfDay(): Int {
