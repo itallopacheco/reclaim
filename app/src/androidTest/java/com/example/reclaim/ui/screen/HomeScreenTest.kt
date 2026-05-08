@@ -19,6 +19,7 @@ import java.time.LocalDate
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -222,6 +223,34 @@ class HomeScreenTest {
         composeRule.onNodeWithText("See all").performClick()
 
         assertTrue(fired)
+    }
+
+    @Test
+    fun tappingPendingHabitCardFiresOnMarkComplete() {
+        var firedId: Long? = null
+        composeRule.setContent {
+            ReclaimTheme {
+                HomeScreenContent(
+                    todayScreenTime = 1.hours,
+                    dailyLimit = 2.hours,
+                    hasUsageAccess = true,
+                    hasAddedApps = true,
+                    onOpenUsageAccess = {},
+                    habitsSummary = HabitsTodaySummary(
+                        earned = Duration.ZERO,
+                        completed = 0,
+                        total = 2,
+                        available = 75.minutes,
+                        nextPending = Habit(7L, "Workout", HabitIcon.DUMBBELL, 45.minutes),
+                    ),
+                    onMarkHabitComplete = { id -> firedId = id },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Workout").performClick()
+
+        assertEquals(7L, firedId)
     }
 
     @Test

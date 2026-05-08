@@ -156,6 +156,7 @@ internal fun HomeScreenContent(
     topApps: List<HomeAppRow> = emptyList(),
     onSeeAllApps: () -> Unit = {},
     habitsSummary: HabitsTodaySummary = EMPTY_HABITS_SUMMARY,
+    onMarkHabitComplete: (Long) -> Unit = {},
 ) {
     val exceeded = hasUsageAccess && todayScreenTime > dailyLimit
     val progress = when {
@@ -187,14 +188,14 @@ internal fun HomeScreenContent(
             TopAppsSection(rows = topApps, onSeeAllApps = onSeeAllApps)
         }
         if (habitsSummary.total > 0) {
-            HabitsTodaySection(summary = habitsSummary)
+            HabitsTodaySection(summary = habitsSummary, onMarkHabitComplete = onMarkHabitComplete)
         }
         Spacer(Modifier.height(24.dp))
     }
 }
 
 @Composable
-private fun HabitsTodaySection(summary: HabitsTodaySummary) {
+private fun HabitsTodaySection(summary: HabitsTodaySummary, onMarkHabitComplete: (Long) -> Unit) {
     Column(modifier = Modifier.padding(top = 36.dp, start = 24.dp, end = 24.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -216,19 +217,20 @@ private fun HabitsTodaySection(summary: HabitsTodaySummary) {
         }
         if (summary.nextPending != null) {
             Spacer(Modifier.height(12.dp))
-            PendingHabitCard(habit = summary.nextPending)
+            PendingHabitCard(habit = summary.nextPending, onMarkComplete = onMarkHabitComplete)
         }
     }
 }
 
 @Composable
-private fun PendingHabitCard(habit: Habit) {
+private fun PendingHabitCard(habit: Habit, onMarkComplete: (Long) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .background(ReclaimBg)
             .border(1.dp, ReclaimLine, RoundedCornerShape(14.dp))
+            .clickable { onMarkComplete(habit.id) }
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
