@@ -80,8 +80,10 @@ fun ReclaimNavHost(
                 HomeScreen(
                     addedApps = app.addedApps,
                     todayScreenTime = app.todayScreenTime,
+                    rankAppsForHome = app.rankAppsForHome,
                     hasUsageAccess = { app.usageStats.hasUsageAccess() },
                     onOpenUsageAccess = openUsageAccess,
+                    onSeeAllApps = { navController.switchTab(TabDestination.Apps) },
                     refreshTick = refreshTick,
                 )
             }

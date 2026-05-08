@@ -11,6 +11,7 @@ import com.example.reclaim.data.DataStoreAddedAppsRepository
 import com.example.reclaim.data.PackageManagerAppCatalog
 import com.example.reclaim.data.UsageStatsManagerStats
 import com.example.reclaim.domain.apps.AddedAppsRepository
+import com.example.reclaim.domain.apps.RankAppsForHomeUseCase
 import com.example.reclaim.domain.apps.SearchAppsUseCase
 import com.example.reclaim.domain.apps.SuggestAppsUseCase
 import com.example.reclaim.domain.apps.TodayScreenTimeUseCase
@@ -45,6 +46,9 @@ class ReclaimApplication : Application() {
 
     val todayScreenTime: TodayScreenTimeUseCase
         get() = TodayScreenTimeUseCase(addedApps = addedApps, usageStats = usageStats)
+
+    val rankAppsForHome: RankAppsForHomeUseCase
+        get() = RankAppsForHomeUseCase(addedApps = addedApps, usageStats = usageStats, catalog = appCatalog)
 }
 
 fun Context.reclaimApplication(): ReclaimApplication =

@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.sp
 import com.example.reclaim.domain.apps.AddedAppsRepository
 import com.example.reclaim.domain.apps.HomeAppRow
 import com.example.reclaim.domain.apps.HomeAppStatus
+import com.example.reclaim.domain.apps.RankAppsForHomeUseCase
 import com.example.reclaim.domain.apps.TodayScreenTimeUseCase
 import com.example.reclaim.ui.theme.ReclaimBg
 import com.example.reclaim.ui.theme.ReclaimInk
@@ -59,8 +60,10 @@ import kotlin.time.Duration
 fun HomeScreen(
     addedApps: AddedAppsRepository,
     todayScreenTime: TodayScreenTimeUseCase,
+    rankAppsForHome: RankAppsForHomeUseCase,
     hasUsageAccess: () -> Boolean,
     onOpenUsageAccess: () -> Unit,
+    onSeeAllApps: () -> Unit,
     refreshTick: Int = 0,
 ) {
     @Suppress("UNUSED_EXPRESSION") refreshTick
@@ -68,6 +71,7 @@ fun HomeScreen(
     val limit = added.fold(Duration.ZERO) { acc, app -> acc + app.dailyQuota }
     val today = todayScreenTime.invoke()
     val accessGranted = hasUsageAccess()
+    val rankedRows = if (accessGranted && added.isNotEmpty()) rankAppsForHome.invoke() else emptyList()
 
     HomeScreenContent(
         todayScreenTime = today,
@@ -75,6 +79,8 @@ fun HomeScreen(
         hasUsageAccess = accessGranted,
         hasAddedApps = added.isNotEmpty(),
         onOpenUsageAccess = onOpenUsageAccess,
+        topApps = rankedRows,
+        onSeeAllApps = onSeeAllApps,
     )
 }
 
