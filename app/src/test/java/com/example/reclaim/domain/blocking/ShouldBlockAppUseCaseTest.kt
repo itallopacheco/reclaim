@@ -6,6 +6,7 @@ import com.example.reclaim.domain.apps.fakes.FakeUsageStats
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
 class ShouldBlockAppUseCaseTest {
@@ -55,6 +56,20 @@ class ShouldBlockAppUseCaseTest {
         val stats = FakeUsageStats(
             avgs = emptyMap(),
             today = mapOf("x" to 45.minutes),
+        )
+        val useCase = ShouldBlockAppUseCase(repo, stats)
+
+        assertTrue(useCase.invoke("x"))
+    }
+
+    @Test
+    fun `returns true when quota is zero and usage today is zero`() {
+        val repo = FakeAddedAppsRepository().apply {
+            add(AddedApp(packageName = "x", dailyQuota = Duration.ZERO))
+        }
+        val stats = FakeUsageStats(
+            avgs = emptyMap(),
+            today = mapOf("x" to Duration.ZERO),
         )
         val useCase = ShouldBlockAppUseCase(repo, stats)
 
