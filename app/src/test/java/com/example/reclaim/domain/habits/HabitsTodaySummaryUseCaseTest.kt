@@ -3,6 +3,7 @@ package com.example.reclaim.domain.habits
 import com.example.reclaim.domain.habits.fakes.FakeHabitsRepository
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
 class HabitsTodaySummaryUseCaseTest {
@@ -36,6 +37,18 @@ class HabitsTodaySummaryUseCaseTest {
 
         assertEquals(
             HabitsTodaySummary(earned = 45.minutes, completed = 2, total = 4, available = 55.minutes),
+            summary,
+        )
+    }
+
+    @Test
+    fun `empty repository yields zero summary`() {
+        val repo = FakeHabitsRepository()
+
+        val summary = HabitsTodaySummaryUseCase(repo).invoke()
+
+        assertEquals(
+            HabitsTodaySummary(earned = Duration.ZERO, completed = 0, total = 0, available = Duration.ZERO),
             summary,
         )
     }
