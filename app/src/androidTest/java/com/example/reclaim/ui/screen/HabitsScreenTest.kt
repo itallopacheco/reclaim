@@ -54,6 +54,48 @@ class HabitsScreenTest {
     }
 
     @Test
+    fun tappingCheckCircleFiresToggleCallbackWithHabitId() {
+        val read = Habit(1L, "Read", HabitIcon.BOOK_OPEN, 30.minutes)
+        var toggled: Long? = null
+        composeRule.setContent {
+            ReclaimTheme {
+                HabitsScreenContent(
+                    habits = listOf(read),
+                    completions = emptyMap(),
+                    summary = HabitsTodaySummary(Duration.ZERO, 0, 1, 30.minutes),
+                    onToggleComplete = { toggled = it },
+                    onEditHabit = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Mark Read complete").performClick()
+
+        assertEquals(1L, toggled)
+    }
+
+    @Test
+    fun tappingHabitRowFiresEditCallbackWithHabitId() {
+        val read = Habit(1L, "Read", HabitIcon.BOOK_OPEN, 30.minutes)
+        var edited: Long? = null
+        composeRule.setContent {
+            ReclaimTheme {
+                HabitsScreenContent(
+                    habits = listOf(read),
+                    completions = emptyMap(),
+                    summary = HabitsTodaySummary(Duration.ZERO, 0, 1, 30.minutes),
+                    onToggleComplete = {},
+                    onEditHabit = { edited = it },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Read").performClick()
+
+        assertEquals(1L, edited)
+    }
+
+    @Test
     fun emptyStateShowsCreateHintAndHidesEarnedCard() {
         composeRule.setContent {
             ReclaimTheme {
