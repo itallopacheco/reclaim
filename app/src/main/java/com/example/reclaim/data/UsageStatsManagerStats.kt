@@ -45,8 +45,7 @@ class UsageStatsManagerStats(
         while (events.getNextEvent(event)) {
             val pkg = event.packageName
             when (event.eventType) {
-                UsageEvents.Event.ACTIVITY_RESUMED,
-                UsageEvents.Event.FOREGROUND_SERVICE_START -> {
+                UsageEvents.Event.ACTIVITY_RESUMED -> {
                     val current = openByPackage[pkg]
                     openByPackage[pkg] = if (current == null) {
                         ActiveSpan(refcount = 1, openedAt = event.timeStamp)
@@ -54,9 +53,7 @@ class UsageStatsManagerStats(
                         current.copy(refcount = current.refcount + 1)
                     }
                 }
-                UsageEvents.Event.ACTIVITY_PAUSED,
-                UsageEvents.Event.ACTIVITY_STOPPED,
-                UsageEvents.Event.FOREGROUND_SERVICE_STOP -> {
+                UsageEvents.Event.ACTIVITY_PAUSED -> {
                     val current = openByPackage[pkg] ?: continue
                     if (current.refcount <= 1) {
                         totals.merge(pkg, event.timeStamp - current.openedAt, Long::plus)
