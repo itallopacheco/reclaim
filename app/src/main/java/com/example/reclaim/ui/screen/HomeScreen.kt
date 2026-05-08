@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -48,6 +49,7 @@ import com.example.reclaim.domain.apps.HomeAppRow
 import com.example.reclaim.domain.apps.HomeAppStatus
 import com.example.reclaim.domain.apps.RankAppsForHomeUseCase
 import com.example.reclaim.domain.apps.TodayScreenTimeUseCase
+import com.example.reclaim.domain.habits.HabitsTodaySummary
 import com.example.reclaim.ui.theme.ReclaimAmber
 import com.example.reclaim.ui.theme.ReclaimBg
 import com.example.reclaim.ui.theme.ReclaimGreen
@@ -57,6 +59,7 @@ import com.example.reclaim.ui.theme.ReclaimInk3
 import com.example.reclaim.ui.theme.ReclaimLine
 import com.example.reclaim.ui.theme.ReclaimRed
 import com.example.reclaim.ui.theme.ReclaimTeal
+import com.example.reclaim.ui.theme.ReclaimTeal2
 import com.example.reclaim.ui.theme.ReclaimTheme
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -91,6 +94,45 @@ fun HomeScreen(
     )
 }
 
+private val EMPTY_HABITS_SUMMARY = HabitsTodaySummary(
+    earned = Duration.ZERO,
+    completed = 0,
+    total = 0,
+    available = Duration.ZERO,
+    nextPending = null,
+)
+
+@Composable
+private fun EarnedPill(earned: Duration) {
+    Spacer(Modifier.height(16.dp))
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(999.dp))
+                .background(ReclaimTeal2)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.AutoAwesome,
+                contentDescription = null,
+                tint = ReclaimTeal,
+                modifier = Modifier.size(14.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = "+ ${earned.inWholeMinutes} min earned today",
+                color = ReclaimTeal,
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
+}
+
 private fun formatScreenTime(d: Duration): String {
     if (d == Duration.ZERO) return "0h 0m"
     val h = d.inWholeHours
@@ -111,6 +153,7 @@ internal fun HomeScreenContent(
     today: LocalDate = LocalDate.now(),
     topApps: List<HomeAppRow> = emptyList(),
     onSeeAllApps: () -> Unit = {},
+    habitsSummary: HabitsTodaySummary = EMPTY_HABITS_SUMMARY,
 ) {
     val exceeded = hasUsageAccess && todayScreenTime > dailyLimit
     val progress = when {
@@ -135,6 +178,9 @@ internal fun HomeScreenContent(
             emptyHint = if (!hasAddedApps) "Add apps to set your daily limit" else null,
             grantUsageAccess = if (!hasUsageAccess) onOpenUsageAccess else null,
         )
+        if (habitsSummary.earned > Duration.ZERO) {
+            EarnedPill(earned = habitsSummary.earned)
+        }
         if (topApps.isNotEmpty()) {
             TopAppsSection(rows = topApps, onSeeAllApps = onSeeAllApps)
         }

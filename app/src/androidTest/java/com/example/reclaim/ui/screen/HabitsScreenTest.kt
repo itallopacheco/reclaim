@@ -34,7 +34,7 @@ class HabitsScreenTest {
                 HabitsScreenContent(
                     habits = listOf(read, workout, meditate, journal),
                     completions = mapOf(3L to 7 * 60 + 24, 4L to 8 * 60 + 2),
-                    summary = HabitsTodaySummary(25.minutes, 2, 4, 75.minutes),
+                    summary = HabitsTodaySummary(25.minutes, 2, 4, 75.minutes, null),
                     onToggleComplete = {},
                     onEditHabit = {},
                 )
@@ -62,7 +62,7 @@ class HabitsScreenTest {
                 HabitsScreenContent(
                     habits = listOf(read),
                     completions = emptyMap(),
-                    summary = HabitsTodaySummary(Duration.ZERO, 0, 1, 30.minutes),
+                    summary = HabitsTodaySummary(Duration.ZERO, 0, 1, 30.minutes, null),
                     onToggleComplete = { toggled = it },
                     onEditHabit = {},
                 )
@@ -83,7 +83,7 @@ class HabitsScreenTest {
                 HabitsScreenContent(
                     habits = listOf(read),
                     completions = emptyMap(),
-                    summary = HabitsTodaySummary(Duration.ZERO, 0, 1, 30.minutes),
+                    summary = HabitsTodaySummary(Duration.ZERO, 0, 1, 30.minutes, null),
                     onToggleComplete = {},
                     onEditHabit = { edited = it },
                 )
@@ -124,7 +124,7 @@ class HabitsScreenTest {
                 HabitsScreenContent(
                     habits = emptyList(),
                     completions = emptyMap(),
-                    summary = HabitsTodaySummary(Duration.ZERO, 0, 0, Duration.ZERO),
+                    summary = HabitsTodaySummary(Duration.ZERO, 0, 0, Duration.ZERO, null),
                     onToggleComplete = {},
                     onEditHabit = {},
                 )

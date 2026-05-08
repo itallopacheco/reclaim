@@ -11,6 +11,9 @@ import androidx.compose.ui.test.performClick
 import com.example.reclaim.domain.apps.App
 import com.example.reclaim.domain.apps.HomeAppRow
 import com.example.reclaim.domain.apps.HomeAppStatus
+import com.example.reclaim.domain.habits.Habit
+import com.example.reclaim.domain.habits.HabitIcon
+import com.example.reclaim.domain.habits.HabitsTodaySummary
 import com.example.reclaim.ui.theme.ReclaimTheme
 import java.time.LocalDate
 import kotlin.time.Duration
@@ -219,6 +222,30 @@ class HomeScreenTest {
         composeRule.onNodeWithText("See all").performClick()
 
         assertTrue(fired)
+    }
+
+    @Test
+    fun earnedPillShowsFormattedMinutesWhenEarnedAboveZero() {
+        composeRule.setContent {
+            ReclaimTheme {
+                HomeScreenContent(
+                    todayScreenTime = 1.hours,
+                    dailyLimit = 2.hours,
+                    hasUsageAccess = true,
+                    hasAddedApps = true,
+                    onOpenUsageAccess = {},
+                    habitsSummary = HabitsTodaySummary(
+                        earned = 25.minutes,
+                        completed = 1,
+                        total = 2,
+                        available = 30.minutes,
+                        nextPending = Habit(2L, "Workout", HabitIcon.DUMBBELL, 30.minutes),
+                    ),
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("+ 25 min earned today").assertIsDisplayed()
     }
 
     @Test
