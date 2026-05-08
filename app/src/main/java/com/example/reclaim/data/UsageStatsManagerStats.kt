@@ -4,6 +4,8 @@ import android.app.AppOpsManager
 import android.app.usage.UsageStatsManager
 import android.os.Process
 import com.example.reclaim.domain.apps.UsageStats
+import java.time.LocalDate
+import java.time.ZoneId
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -24,6 +26,20 @@ class UsageStatsManagerStats(
             .mapValues { (_, entries) ->
                 (entries.sumOf { it.totalTimeInForeground } / DAYS_IN_WEEK).milliseconds
             }
+    }
+
+    override fun usageToday(): Map<String, Duration> {
+        if (!hasUsageAccess()) return emptyMap()
+        val now = System.currentTimeMillis()
+        val startOfToday = LocalDate.now()
+            .atStartOfDay(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+        val raw = usageStatsManager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, startOfToday, now)
+            ?: return emptyMap()
+        return raw
+            .groupBy { it.packageName }
+            .mapValues { (_, entries) -> entries.sumOf { it.totalTimeInForeground }.milliseconds }
     }
 
     fun hasUsageAccess(): Boolean {
