@@ -10,12 +10,15 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.example.reclaim.data.DataStoreAddedAppsRepository
 import com.example.reclaim.data.DataStoreHabitsRepository
 import com.example.reclaim.data.PackageManagerAppCatalog
+import com.example.reclaim.data.UsageEventsForegroundAppMonitor
 import com.example.reclaim.data.UsageStatsManagerStats
 import com.example.reclaim.domain.apps.AddedAppsRepository
 import com.example.reclaim.domain.apps.RankAppsForHomeUseCase
 import com.example.reclaim.domain.apps.SearchAppsUseCase
 import com.example.reclaim.domain.apps.SuggestAppsUseCase
 import com.example.reclaim.domain.apps.TodayScreenTimeUseCase
+import com.example.reclaim.domain.blocking.ForegroundAppMonitor
+import com.example.reclaim.domain.blocking.ShouldBlockAppUseCase
 import com.example.reclaim.domain.habits.HabitsRepository
 import com.example.reclaim.domain.habits.HabitsTodaySummaryUseCase
 
@@ -55,7 +58,21 @@ class ReclaimApplication : Application() {
         get() = TodayScreenTimeUseCase(addedApps = addedApps, usageStats = usageStats)
 
     val rankAppsForHome: RankAppsForHomeUseCase
-        get() = RankAppsForHomeUseCase(addedApps = addedApps, usageStats = usageStats, catalog = appCatalog)
+        get() = RankAppsForHomeUseCase(
+            addedApps = addedApps,
+            usageStats = usageStats,
+            catalog = appCatalog,
+            blockingDecision = shouldBlockApp,
+        )
+
+    val shouldBlockApp: ShouldBlockAppUseCase
+        get() = ShouldBlockAppUseCase(addedApps = addedApps, usageStats = usageStats)
+
+    val foregroundAppMonitor: ForegroundAppMonitor by lazy {
+        UsageEventsForegroundAppMonitor(
+            usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager,
+        )
+    }
 
     val habits: HabitsRepository by lazy {
         DataStoreHabitsRepository(habitsDataStore)

@@ -3,7 +3,10 @@ package com.example.reclaim.domain.apps
 import com.example.reclaim.domain.apps.fakes.FakeAddedAppsRepository
 import com.example.reclaim.domain.apps.fakes.FakeAppCatalog
 import com.example.reclaim.domain.apps.fakes.FakeUsageStats
+import com.example.reclaim.domain.blocking.fakes.FakeBlockingDecision
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -27,7 +30,7 @@ class RankAppsForHomeUseCaseTest {
         )
         val catalog = FakeAppCatalog(listOf(instagram, tiktok))
 
-        val result = RankAppsForHomeUseCase(repo, usage, catalog).invoke()
+        val result = RankAppsForHomeUseCase(repo, usage, catalog, FakeBlockingDecision()).invoke()
 
         assertEquals(
             listOf(
@@ -49,7 +52,7 @@ class RankAppsForHomeUseCaseTest {
         )
         val catalog = FakeAppCatalog(emptyList())
 
-        val result = RankAppsForHomeUseCase(repo, usage, catalog).invoke()
+        val result = RankAppsForHomeUseCase(repo, usage, catalog, FakeBlockingDecision()).invoke()
 
         assertEquals("com.unknown.app", result.single().app.displayName)
     }
@@ -71,8 +74,45 @@ class RankAppsForHomeUseCaseTest {
         )
         val catalog = FakeAppCatalog(listOf(tiktok, instagram))
 
-        val result = RankAppsForHomeUseCase(repo, usage, catalog).invoke()
+        val result = RankAppsForHomeUseCase(repo, usage, catalog, FakeBlockingDecision()).invoke()
 
         assertEquals(listOf("Instagram", "TikTok"), result.map { it.app.displayName })
+    }
+
+    @Test
+    fun `marks isBlockingNow when blocking decision says blocked`() {
+        val instagram = App("com.instagram.android", "Instagram", isLauncherApp = true)
+        val repo = FakeAddedAppsRepository().apply {
+            add(AddedApp("com.instagram.android", 30.minutes))
+        }
+        val usage = FakeUsageStats(
+            avgs = emptyMap(),
+            today = mapOf("com.instagram.android" to 30.minutes),
+        )
+        val catalog = FakeAppCatalog(listOf(instagram))
+        val decision = FakeBlockingDecision(blocked = setOf("com.instagram.android"))
+
+        val result = RankAppsForHomeUseCase(repo, usage, catalog, decision).invoke()
+
+        assertTrue(result.single().isBlockingNow)
+    }
+
+    @Test
+    fun `does not mark isBlockingNow when blocking decision says not blocked even if OVER`() {
+        val instagram = App("com.instagram.android", "Instagram", isLauncherApp = true)
+        val repo = FakeAddedAppsRepository().apply {
+            add(AddedApp("com.instagram.android", 30.minutes))
+        }
+        val usage = FakeUsageStats(
+            avgs = emptyMap(),
+            today = mapOf("com.instagram.android" to 45.minutes),
+        )
+        val catalog = FakeAppCatalog(listOf(instagram))
+        val decision = FakeBlockingDecision(blocked = emptySet())
+
+        val result = RankAppsForHomeUseCase(repo, usage, catalog, decision).invoke()
+
+        assertEquals(HomeAppStatus.OVER, result.single().status)
+        assertFalse(result.single().isBlockingNow)
     }
 }

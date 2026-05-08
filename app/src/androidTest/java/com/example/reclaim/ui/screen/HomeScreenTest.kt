@@ -425,4 +425,120 @@ class HomeScreenTest {
         composeRule.onNodeWithText("TikTok").assertIsDisplayed()
         composeRule.onNodeWithText("2h / 1h").assertIsDisplayed()
     }
+
+    @Test
+    fun blockingInactiveBannerVisibleWhenInactive() {
+        composeRule.setContent {
+            ReclaimTheme {
+                HomeScreenContent(
+                    todayScreenTime = 1.hours,
+                    dailyLimit = 2.hours,
+                    hasUsageAccess = true,
+                    hasAddedApps = true,
+                    onOpenUsageAccess = {},
+                    blockingInactive = true,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(
+            "Blocking is inactive. Grant the overlay permission to enable it.",
+        ).assertIsDisplayed()
+        composeRule.onNodeWithText("Grant").assertIsDisplayed()
+    }
+
+    @Test
+    fun blockingInactiveBannerHiddenWhenActive() {
+        composeRule.setContent {
+            ReclaimTheme {
+                HomeScreenContent(
+                    todayScreenTime = 1.hours,
+                    dailyLimit = 2.hours,
+                    hasUsageAccess = true,
+                    hasAddedApps = true,
+                    onOpenUsageAccess = {},
+                    blockingInactive = false,
+                )
+            }
+        }
+
+        composeRule.onAllNodesWithText("Blocking is inactive", substring = true)
+            .assertCountEquals(0)
+    }
+
+    @Test
+    fun topAppsRowShowsBlockingNowBadgeWhenIsBlockingNow() {
+        val instagram = App("com.instagram.android", "Instagram", isLauncherApp = true)
+        composeRule.setContent {
+            ReclaimTheme {
+                HomeScreenContent(
+                    todayScreenTime = 30.minutes,
+                    dailyLimit = 30.minutes,
+                    hasUsageAccess = true,
+                    hasAddedApps = true,
+                    onOpenUsageAccess = {},
+                    topApps = listOf(
+                        HomeAppRow(
+                            app = instagram,
+                            today = 30.minutes,
+                            quota = 30.minutes,
+                            status = HomeAppStatus.OVER,
+                            isBlockingNow = true,
+                        ),
+                    ),
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Blocking now").assertIsDisplayed()
+    }
+
+    @Test
+    fun topAppsRowHidesBlockingNowBadgeWhenNotBlocking() {
+        val instagram = App("com.instagram.android", "Instagram", isLauncherApp = true)
+        composeRule.setContent {
+            ReclaimTheme {
+                HomeScreenContent(
+                    todayScreenTime = 25.minutes,
+                    dailyLimit = 30.minutes,
+                    hasUsageAccess = true,
+                    hasAddedApps = true,
+                    onOpenUsageAccess = {},
+                    topApps = listOf(
+                        HomeAppRow(
+                            app = instagram,
+                            today = 25.minutes,
+                            quota = 30.minutes,
+                            status = HomeAppStatus.WARN,
+                            isBlockingNow = false,
+                        ),
+                    ),
+                )
+            }
+        }
+
+        composeRule.onAllNodesWithText("Blocking now").assertCountEquals(0)
+    }
+
+    @Test
+    fun tappingGrantInBannerInvokesOpenOverlaySettings() {
+        var fired = false
+        composeRule.setContent {
+            ReclaimTheme {
+                HomeScreenContent(
+                    todayScreenTime = 1.hours,
+                    dailyLimit = 2.hours,
+                    hasUsageAccess = true,
+                    hasAddedApps = true,
+                    onOpenUsageAccess = {},
+                    blockingInactive = true,
+                    onOpenOverlaySettings = { fired = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Grant").performClick()
+
+        assertTrue(fired)
+    }
 }

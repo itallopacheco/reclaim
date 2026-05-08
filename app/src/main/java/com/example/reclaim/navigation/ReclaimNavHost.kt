@@ -22,6 +22,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.reclaim.data.Permissions
 import com.example.reclaim.domain.apps.AddedApp
 import com.example.reclaim.domain.apps.App
 import com.example.reclaim.reclaimApplication
@@ -49,6 +50,7 @@ fun ReclaimNavHost(
             Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
     }
+    val openOverlaySettings: () -> Unit = { Permissions.openOverlaySettings(context) }
     NavHost(
         navController = navController,
         startDestination = Destination.OnboardingValue.route
@@ -60,12 +62,15 @@ fun ReclaimNavHost(
             )
         }
         composable(Destination.OnboardingPermissions.route) {
-            OnResumeDeferred {
-                if (app.usageStats.hasUsageAccess()) navController.enterMainApp()
-            }
+            var refreshTick by remember { mutableIntStateOf(0) }
+            OnResume { refreshTick++ }
+            @Suppress("UNUSED_EXPRESSION") refreshTick
             OnboardingPermissionsScreen(
+                usageAccessGranted = app.usageStats.hasUsageAccess(),
+                overlayPermissionGranted = Permissions.canDrawOverlays(context),
                 onOpenUsageAccess = openUsageAccess,
-                onSkip = { navController.enterMainApp() },
+                onOpenOverlaySettings = openOverlaySettings,
+                onContinue = { navController.enterMainApp() },
             )
         }
 
@@ -85,7 +90,9 @@ fun ReclaimNavHost(
                     habitsRepository = app.habits,
                     habitsSummary = app.habitsTodaySummary,
                     hasUsageAccess = { app.usageStats.hasUsageAccess() },
+                    hasOverlayPermission = { Permissions.canDrawOverlays(context) },
                     onOpenUsageAccess = openUsageAccess,
+                    onOpenOverlaySettings = openOverlaySettings,
                     onSeeAllApps = { navController.switchTab(TabDestination.Apps) },
                     refreshTick = refreshTick,
                 )
@@ -101,6 +108,7 @@ fun ReclaimNavHost(
                 AppsScreen(
                     addedApps = app.addedApps,
                     catalog = app.appCatalog,
+                    blockingDecision = app.shouldBlockApp,
                     onAppClick = { packageName ->
                         navController.navigate(Destination.EditApp.routeFor(packageName))
                     },
