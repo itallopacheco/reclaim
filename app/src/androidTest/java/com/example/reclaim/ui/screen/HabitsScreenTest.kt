@@ -96,6 +96,28 @@ class HabitsScreenTest {
     }
 
     @Test
+    fun togglingCompleteImmediatelyMovesRowAcrossSections() {
+        val read = Habit(1L, "Read", HabitIcon.BOOK_OPEN, 30.minutes)
+        val repo = com.example.reclaim.ui.screen.fakes.FakeHabitsRepository(initial = listOf(read))
+        val summaryUseCase = com.example.reclaim.domain.habits.HabitsTodaySummaryUseCase(repo)
+
+        composeRule.setContent {
+            ReclaimTheme {
+                HabitsScreen(
+                    habitsRepository = repo,
+                    summaryUseCase = summaryUseCase,
+                    onEditHabit = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Pending · 1").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Mark Read complete").performClick()
+
+        composeRule.onNodeWithText("Completed · 1").assertIsDisplayed()
+    }
+
+    @Test
     fun emptyStateShowsCreateHintAndHidesEarnedCard() {
         composeRule.setContent {
             ReclaimTheme {

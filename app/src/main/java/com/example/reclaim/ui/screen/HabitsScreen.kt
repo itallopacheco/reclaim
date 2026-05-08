@@ -23,6 +23,10 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,7 +62,9 @@ fun HabitsScreen(
     onEditHabit: (Long) -> Unit,
     refreshTick: Int = 0,
 ) {
+    var localTick by remember { mutableIntStateOf(0) }
     @Suppress("UNUSED_EXPRESSION") refreshTick
+    @Suppress("UNUSED_EXPRESSION") localTick
     val habits = habitsRepository.habits()
     val completions = habitsRepository.completionsToday()
     val summary = summaryUseCase.invoke()
@@ -70,6 +76,7 @@ fun HabitsScreen(
         onToggleComplete = { id ->
             if (id in completions.keys) habitsRepository.unmarkToday(id)
             else habitsRepository.markCompleteToday(id, currentMinuteOfDay())
+            localTick++
         },
         onEditHabit = onEditHabit,
     )
