@@ -184,7 +184,34 @@ internal fun HomeScreenContent(
         if (topApps.isNotEmpty()) {
             TopAppsSection(rows = topApps, onSeeAllApps = onSeeAllApps)
         }
+        if (habitsSummary.total > 0) {
+            HabitsTodaySection(summary = habitsSummary)
+        }
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun HabitsTodaySection(summary: HabitsTodaySummary) {
+    Column(modifier = Modifier.padding(top = 36.dp, start = 24.dp, end = 24.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Habits today",
+                color = ReclaimInk,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = "${summary.completed} / ${summary.total}",
+                color = ReclaimInk3,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+            )
+        }
     }
 }
 

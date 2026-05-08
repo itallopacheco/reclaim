@@ -225,6 +225,31 @@ class HomeScreenTest {
     }
 
     @Test
+    fun habitsSectionShowsHeaderWithCompletedOverTotalCounter() {
+        composeRule.setContent {
+            ReclaimTheme {
+                HomeScreenContent(
+                    todayScreenTime = 1.hours,
+                    dailyLimit = 2.hours,
+                    hasUsageAccess = true,
+                    hasAddedApps = true,
+                    onOpenUsageAccess = {},
+                    habitsSummary = HabitsTodaySummary(
+                        earned = 30.minutes,
+                        completed = 1,
+                        total = 4,
+                        available = 75.minutes,
+                        nextPending = Habit(2L, "Workout", HabitIcon.DUMBBELL, 45.minutes),
+                    ),
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Habits today").assertIsDisplayed()
+        composeRule.onNodeWithText("1 / 4").assertIsDisplayed()
+    }
+
+    @Test
     fun earnedPillHiddenWhenNoMinutesEarnedToday() {
         composeRule.setContent {
             ReclaimTheme {
